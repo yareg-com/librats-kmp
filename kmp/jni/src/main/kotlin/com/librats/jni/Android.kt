@@ -1,12 +1,12 @@
-package com.librats
+package com.librats.jni
 
 import android.util.Log
 
-class RatsClient {
+object Android {
     private val tag: String
         get() = javaClass.simpleName
 
-    init {
+    fun loadLibrary() {
         try {
             System.loadLibrary("rats_jni")
         } catch (e: UnsatisfiedLinkError) {
@@ -15,8 +15,4 @@ class RatsClient {
         }
     }
 
-    val abiVersion: Int
-        get() = nativeAbi()
-
-    external fun nativeAbi(): Int
 }
