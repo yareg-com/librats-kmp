@@ -22,26 +22,35 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             LibratskmpTheme {
+                val node = retain { RatsNode(8080) }
+                val info = retain { RatsBuild }
+                val status = node.status.collectAsStateWithLifecycle()
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
-                        TopAppBar(title = { Text("Librats") })
+                        TopAppBar(
+                            title = { Text("Librats") },
+                            actions = {
+                                OutlinedButton(onClick = { node.start() }) {
+                                    Text("Start")
+                                }
+                            }
+                        )
                     }
                 ) { innerPadding ->
 
                     Column(modifier = Modifier.padding(innerPadding)) {
 
-                        val node = retain { RatsNode(8080) }
-                        val info = retain { RatsBuild }
-
-                        val ptr = node.ptr.collectAsStateWithLifecycle()
-                        val localId = node.localId.collectAsStateWithLifecycle(initialValue = "No id yet")
-
-                        Text("Node PTR: ${ptr.value}")
+                        Text("Node PTR: ${node.ptr}")
 
                         HorizontalDivider()
 
-                        Text("Node local ID: ${localId.value}")
+                        Text("Node local ID: ${node.localId}")
+
+                        HorizontalDivider()
+
+                        Text("Status: ${status.value}")
 
                         HorizontalDivider()
 
