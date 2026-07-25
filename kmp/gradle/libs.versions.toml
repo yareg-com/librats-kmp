@@ -10,11 +10,14 @@ android-build-tools = "37.0.0"
 
 android-jvm-target = "1.8" # Java 8 (API 24+), can be Java 11 for API 29+, Java 17 for API 33+
 
+kotlinx-coroutines = "1.11.0"
+
 androidx-core       = "1.19.0"
 androidx-annotation = "1.10.0"
 androidx-activity   = "1.13.0"
 androidx-lifecycle  = "2.11.0"
-compose-bom         = "2026.06.01"
+
+compose-bom = "2026.06.01"
 
 [plugins] #-------------------------------------------------------------------------------------------------------------
 
@@ -29,6 +32,8 @@ android-application  = { id = "com.android.application", version.ref = "android-
 [libraries] #-----------------------------------------------------------------------------------------------------------
 
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 
 androidx-core       = { module = "androidx.core:core-ktx",                   version.ref = "androidx-core" }
 androidx-activity   = { module = "androidx.activity:activity-compose",       version.ref = "androidx-activity" }
