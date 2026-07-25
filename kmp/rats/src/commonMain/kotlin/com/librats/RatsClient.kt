@@ -66,7 +66,7 @@ object RatsClient {
     external fun nativeOnPeerConnected(ptr: Long, callback: ConnectionCallback): Int
     external fun nativeOnPeerDisconnected(ptr: Long, callback: DisconnectCallback): Int
 
-    external fun nativeEnableDht(ptr: Long, dhtPort: Int, discoveryKey: String): Int
+    external fun nativeEnableDht(ptr: Long, dhtPort: Int, discoveryKey: String?): Int
     external fun nativeEnableMdns(ptr: Long): Int
     external fun nativeEnablePortMapping(ptr: Long, enableUpnp: Boolean, enableNatpmp: Boolean): Int
 

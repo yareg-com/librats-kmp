@@ -1,30 +1,111 @@
 package com.librats
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
-
 class RatsNode(
-    port: Int = 0
-) {
-    val ptr: Long = RatsClient.nativeCreate(port).apply {
+    port: Int = 0,
+    config: RatsNode.() -> Unit = { }
+) : AutoCloseable {
+    private val ptr: Long = RatsClient.nativeCreate(port).apply {
         if (this == 0L) throw RatsException("Failed to create native rats node")
     }
 
+    init {
+        config(this)
+    }
+
+    //------------------------------------------------------------------------------------------------------------------
+    //
+    // LIFECYCLE
+    //
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
+     * Starts the node: binds the listener and brings up enabled subsystems
+     *
+     * @return {@link #OK} on success, otherwise a {@code rats_error_t} code ({@link #ERR_ALREADY_STARTED},
+     * {@link #ERR_BIND})
+     */
+
+    fun start(): Int = RatsClient.nativeStart(ptr)
+
+    /**
+     * Stops the node and closes all connections
+     */
+
+    fun stop(): Unit = RatsClient.nativeStop(ptr)
+
+    /**
+     * Destroys the node and releases all native resources
+     */
+    fun destroy(): Unit = RatsClient.nativeDestroy(ptr)
+
+    override fun close() = destroy()
+
+    //------------------------------------------------------------------------------------------------------------------
+    //
+    // IDENTITY
+    //
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
+     * @return the port the node is listening on
+     */
+
+    val port: Int
+        get() = RatsClient.nativeListenPort(ptr)
+
+    /**
+     * @return our self-certifying peer id as 64-char lowercase hex
+     */
     val localId: String
         get() = RatsClient.nativeLocalId(ptr)
 
+    /**
+     * @return the application protocol id bound into the handshake (e.g. "librats/1.0")
+     */
 
-    val status: StateFlow<String>
-        field = MutableStateFlow("STOPPED")
+    val protocol: String
+        get() = RatsClient.nativeProtocol(ptr)
 
     //------------------------------------------------------------------------------------------------------------------
+    //
+    // DISCOVERY
+    //
+    //------------------------------------------------------------------------------------------------------------------
 
-    fun start() = status.update {
-        when (RatsClient.nativeStart(ptr)) {
-            RatsClient.OK -> "ACTIVE"
-            else -> "ERROR"
-        }
-    }
+    val discovery: Discovery
+        get() = Discovery { ptr }
+
+    //------------------------------------------------------------------------------------------------------------------
+    //
+    // CONNECTIONS
+    //
+    //------------------------------------------------------------------------------------------------------------------
+
+    val peers: Peers
+        get() = Peers { ptr }
+
+    /**
+     * Dials a peer at host:port.
+     *
+     * @return {@link #OK} on success, otherwise a {@code rats_error_t} code
+     */
+
+    fun connect(
+        host: String,
+        port: Int
+    ): Int = RatsClient.nativeConnect(
+        ptr = ptr,
+        host = host,
+        port = port
+    )
+
+    //------------------------------------------------------------------------------------------------------------------
+    //
+    // MESSAGES
+    //
+    //------------------------------------------------------------------------------------------------------------------
+
+    val message: Message
+        get() = Message { ptr }
 
 }

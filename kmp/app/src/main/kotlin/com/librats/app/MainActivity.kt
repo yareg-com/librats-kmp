@@ -1,6 +1,7 @@
 package com.librats.app
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -10,7 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.librats.ConnectionCallback
 import com.librats.RatsBuild
 import com.librats.RatsNode
 import com.librats.app.ui.theme.LibratskmpTheme
@@ -19,12 +20,29 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         enableEdgeToEdge()
+
         setContent {
             LibratskmpTheme {
-                val node = retain { RatsNode(8080) }
+                val node = retain {
+                    RatsNode(8080) {
+                        discovery.enableMdns()
+
+                        peers.onConnected(object: ConnectionCallback {
+                            override fun onConnected(peerId: String) {
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Connected: $peerId",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        })
+                    }
+                }
+
                 val info = retain { RatsBuild }
-                val status = node.status.collectAsStateWithLifecycle()
+                //val status = node.status.collectAsStateWithLifecycle()
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -42,15 +60,11 @@ class MainActivity : ComponentActivity() {
 
                     Column(modifier = Modifier.padding(innerPadding)) {
 
-                        Text("Node PTR: ${node.ptr}")
+                        Text("Local ID: ${node.localId}")
 
                         HorizontalDivider()
 
-                        Text("Node local ID: ${node.localId}")
-
-                        HorizontalDivider()
-
-                        Text("Status: ${status.value}")
+                        //Text("Status: ${status.value}")
 
                         HorizontalDivider()
 

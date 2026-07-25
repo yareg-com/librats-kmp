@@ -1,0 +1,48 @@
+package com.librats
+
+class Discovery(
+    private val ptr: () -> Long
+) {
+
+    /**
+        Enables DHT discovery. Call before node start
+        @param port - DHT port (0 = ephemeral)
+        @param key  - app namespace key (null = default)
+        @return {@link #OK} on success, otherwise a {@code rats_error_t} code
+    */
+
+    fun enableDht(
+        port: Int = 0,
+        key: String? = null
+    ): Int = RatsClient.nativeEnableDht(
+        ptr = ptr(),
+        dhtPort = port,
+        discoveryKey = key
+    )
+
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
+        Enables local-network mDNS discovery. Call before node start
+        @return {@link #OK} on success, otherwise a {@code rats_error_t} code
+    */
+
+    fun enableMdns(): Int = RatsClient.nativeEnableMdns(ptr())
+
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
+        Enables automatic NAT port forwarding for the listen port. Call before node start
+        @return {@link #OK} on success, otherwise a {@code rats_error_t} code
+    */
+
+    fun enablePortMapping(
+        upnp: Boolean,
+        natPmp: Boolean
+    ): Int = RatsClient.nativeEnablePortMapping(
+        ptr = ptr(),
+        enableUpnp = upnp,
+        enableNatpmp = natPmp
+    )
+
+}
