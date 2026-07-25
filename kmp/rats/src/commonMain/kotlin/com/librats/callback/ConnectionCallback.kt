@@ -1,14 +1,14 @@
-package com.librats
+package com.librats.callback
 
 /**
  * Callback invoked when a peer connection is established.
  * 
  * 
- * Register with [RatsClient.setConnectionCallback] before
- * [RatsClient.start]. Fires on an internal reactor thread; marshal to
+ * Register with [com.librats.RatsClient.setConnectionCallback] before
+ * [com.librats.RatsClient.start]. Fires on an internal reactor thread; marshal to
  * the UI thread before touching views.
  */
-interface ConnectionCallback {
+fun interface ConnectionCallback {
 
     /**
      * Called when a peer handshake completes.

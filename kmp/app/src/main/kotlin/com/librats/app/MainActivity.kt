@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Modifier
-import com.librats.ConnectionCallback
 import com.librats.RatsBuild
 import com.librats.RatsNode
 import com.librats.app.ui.theme.LibratskmpTheme
@@ -29,15 +28,13 @@ class MainActivity : ComponentActivity() {
                     RatsNode(8080) {
                         discovery.enableMdns()
 
-                        peers.onConnected(object: ConnectionCallback {
-                            override fun onConnected(peerId: String) {
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Connected: $peerId",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        })
+                        peers.onConnected { peerId ->
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Connected: $peerId",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 }
 

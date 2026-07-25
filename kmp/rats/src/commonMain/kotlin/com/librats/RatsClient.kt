@@ -1,5 +1,14 @@
 package com.librats
 
+import com.librats.callback.ConnectionCallback
+import com.librats.callback.DisconnectCallback
+import com.librats.callback.FileCompleteCallback
+import com.librats.callback.FileOfferCallback
+import com.librats.callback.FileProgressCallback
+import com.librats.callback.JsonMessageCallback
+import com.librats.callback.MessageCallback
+import com.librats.callback.TopicMessageCallback
+
 object RatsClient {
 
     init {

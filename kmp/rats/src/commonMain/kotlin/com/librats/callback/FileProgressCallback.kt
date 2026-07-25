@@ -1,15 +1,15 @@
-package com.librats
+package com.librats.callback
 
 /**
  * Callback invoked with progress updates for an in-flight transfer.
  * 
  * 
- * Register with [RatsClient.setFileProgressCallback] before
- * [RatsClient.start]. Requires the file-transfer subsystem
- * ([RatsClient.enableFileTransfer]). Fires on an internal reactor
+ * Register with [com.librats.RatsClient.setFileProgressCallback] before
+ * [com.librats.RatsClient.start]. Requires the file-transfer subsystem
+ * ([com.librats.RatsClient.enableFileTransfer]). Fires on an internal reactor
  * thread.
  */
-interface FileProgressCallback {
+fun interface FileProgressCallback {
 
     /**
      * Called as bytes are transferred.

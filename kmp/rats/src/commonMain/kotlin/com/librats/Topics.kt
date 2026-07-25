@@ -1,5 +1,7 @@
 package com.librats
 
+import com.librats.callback.TopicMessageCallback
+
 class Topics(
     private val ptr: () -> Long
 ) {

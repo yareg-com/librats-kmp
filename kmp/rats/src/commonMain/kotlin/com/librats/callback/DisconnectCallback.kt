@@ -1,13 +1,13 @@
-package com.librats
+package com.librats.callback
 
 /**
  * Callback invoked when a peer disconnects.
  * 
  * 
- * Register with [RatsClient.setDisconnectCallback] before
- * [RatsClient.start]. Fires on an internal reactor thread.
+ * Register with [com.librats.RatsClient.setDisconnectCallback] before
+ * [com.librats.RatsClient.start]. Fires on an internal reactor thread.
  */
-interface DisconnectCallback {
+fun interface DisconnectCallback {
 
     /**
      * Called when a peer connection is torn down.

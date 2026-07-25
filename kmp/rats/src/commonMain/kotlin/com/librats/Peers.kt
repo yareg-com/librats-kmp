@@ -1,5 +1,8 @@
 package com.librats
 
+import com.librats.callback.ConnectionCallback
+import com.librats.callback.DisconnectCallback
+
 class Peers(
     private val ptr: () -> Long
 ) {

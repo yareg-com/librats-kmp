@@ -1,17 +1,17 @@
-package com.librats
+package com.librats.callback
 
 /**
  * Callback invoked when a peer offers a file or directory.
  * 
  * 
- * Register with [RatsClient.setFileOfferCallback] before
- * [RatsClient.start]. Requires the file-transfer subsystem
- * ([RatsClient.enableFileTransfer]). Respond by calling
- * [RatsClient.acceptFile] or
- * [RatsClient.rejectFile]. Fires on an internal reactor
+ * Register with [com.librats.RatsClient.setFileOfferCallback] before
+ * [com.librats.RatsClient.start]. Requires the file-transfer subsystem
+ * ([com.librats.RatsClient.enableFileTransfer]). Respond by calling
+ * [com.librats.RatsClient.acceptFile] or
+ * [com.librats.RatsClient.rejectFile]. Fires on an internal reactor
  * thread.
  */
-interface FileOfferCallback {
+fun interface FileOfferCallback {
 
     /**
      * Called when a peer offers a transfer.

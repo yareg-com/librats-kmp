@@ -1,15 +1,15 @@
-package com.librats
+package com.librats.callback
 
 /**
  * Callback invoked when a transfer finishes (successfully or not).
  * 
  * 
- * Register with [RatsClient.setFileCompleteCallback] before
- * [RatsClient.start]. Requires the file-transfer subsystem
- * ([RatsClient.enableFileTransfer]). Fires on an internal reactor
+ * Register with [com.librats.RatsClient.setFileCompleteCallback] before
+ * [com.librats.RatsClient.start]. Requires the file-transfer subsystem
+ * ([com.librats.RatsClient.enableFileTransfer]). Fires on an internal reactor
  * thread.
  */
-interface FileCompleteCallback {
+fun interface FileCompleteCallback {
 
     /**
      * Called when a transfer terminates.
@@ -21,7 +21,7 @@ interface FileCompleteCallback {
     fun onFileComplete(
         transferId: Long,
         success: Boolean,
-        path: String? = null
+        path: String?
     )
 
 }

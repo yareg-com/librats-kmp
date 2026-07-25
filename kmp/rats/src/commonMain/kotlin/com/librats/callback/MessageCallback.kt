@@ -1,13 +1,13 @@
-package com.librats
+package com.librats.callback
 
 /**
  * Callback invoked when raw bytes arrive on a named application channel.
  * 
  * 
- * Register per-channel with [RatsClient.on]
- * before [RatsClient.start]. Fires on an internal reactor thread.
+ * Register per-channel with [com.librats.RatsClient.on]
+ * before [com.librats.RatsClient.start]. Fires on an internal reactor thread.
  */
-interface MessageCallback {
+fun interface MessageCallback {
 
     /**
      * Called when a message is received on the channel this callback was
