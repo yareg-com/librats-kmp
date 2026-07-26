@@ -1,6 +1,4 @@
 jdk:
   - openjdk21
 before_install:
-  - apt-get update -y
-  - apt-get install -y cmake
   - cd kmp

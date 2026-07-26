@@ -35,6 +35,26 @@ kotlin {
     }
 }
 
+val cmake: String by lazy {
+    val sdkDir = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+
+    if (sdkDir != null) {
+        val path = file("$sdkDir/cmake")
+
+        if (path.exists()) {
+            val binary = path.listFiles()?.maxOrNull()?.resolve("bin/cmake")
+
+            if (binary?.exists() == true) {
+                println("Using Android SDK cmake!")
+                return@lazy binary.absolutePath
+            }
+        }
+    }
+
+    println("Using Android SDK cmake!")
+    "cmake"
+}
+
 val cxxBuildDir = "intermediates/cxx"
 
 val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
@@ -49,7 +69,7 @@ val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
     outputs.dir(buildDir)
 
     commandLine(
-        "cmake",
+        cmake,
         "-DRATS_BUILD_TESTS=OFF",
         "-DRATS_BUILD_CLIENT=OFF",
         "-DRATS_SHARED_LIBRARY=ON",
@@ -68,7 +88,7 @@ val cmakeBuild = tasks.register<Exec>("cmakeBuild") {
     val buildDir = layout.buildDirectory.dir(cxxBuildDir).get().asFile
     inputs.dir(buildDir)
 
-    commandLine("cmake", "--build", buildDir.absolutePath, "--parallel")
+    commandLine(cmake, "--build", buildDir.absolutePath, "--parallel")
 }
 
 val buildJvmNativeLib = tasks.register<Copy>("buildJvmNativeLib") {
