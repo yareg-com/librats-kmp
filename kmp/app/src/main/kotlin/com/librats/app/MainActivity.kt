@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
 
                         HorizontalDivider()
 
-                        Text("Rats build git commit hash: ${info.getCommitHash}")
+                        Text("Rats build git commit hash: ${info.gitCommitHash}")
                     }
                 }
             }

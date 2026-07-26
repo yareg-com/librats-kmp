@@ -2,7 +2,13 @@ package com.librats
 
 object RatsBuild {
 
-    val getCommitHash: String
+    val version: IntArray
+        get() = RatsClient.nativeVersion()
+
+    val versionString: String
+        get() = RatsClient.nativeVersionString()
+
+    val gitCommitHash: String
         get() = RatsClient.nativeGitDescribe()
 
 }
