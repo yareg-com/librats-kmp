@@ -1,5 +1,10 @@
 package com.librats
 
+import com.librats.subsystem.Discovery
+import com.librats.subsystem.Message
+import com.librats.subsystem.Peers
+import com.librats.subsystem.Topics
+
 class RatsNode(
     port: Int = 0,
     config: RatsNode.() -> Unit = { }

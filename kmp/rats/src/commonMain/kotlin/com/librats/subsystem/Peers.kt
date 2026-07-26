@@ -1,5 +1,6 @@
-package com.librats
+package com.librats.subsystem
 
+import com.librats.RatsClient
 import com.librats.callback.ConnectionCallback
 import com.librats.callback.DisconnectCallback
 

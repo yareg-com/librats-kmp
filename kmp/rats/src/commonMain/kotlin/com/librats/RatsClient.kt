@@ -12,14 +12,7 @@ import com.librats.callback.TopicMessageCallback
 object RatsClient {
 
     init {
-        //loadNativeLib()
-
-        try {
-            System.loadLibrary("rats_jni")
-        } catch (e: Exception) {
-            //Log.e(tag, "Failed to load native library", e)
-            throw e
-        }
+        loadLibrary()
     }
 
     // rats_error_t values (must match src/bindings/rats.h).

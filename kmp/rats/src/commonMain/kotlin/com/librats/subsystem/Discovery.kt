@@ -1,4 +1,6 @@
-package com.librats
+package com.librats.subsystem
+
+import com.librats.RatsClient
 
 class Discovery(
     private val ptr: () -> Long
