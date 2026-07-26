@@ -35,16 +35,27 @@ kotlin {
     }
 }
 
-/*val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
+val cxxBuildDir = "intermediates/cxx"
+
+val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
     description = "Generate build files"
 
-    val cppDir = file("cpp")
-    val buildDir = layout.buildDirectory.dir("cmake-jvm").get().asFile
+    val sourceDir = file("../..")
+    val buildDir = layout.buildDirectory.dir(cxxBuildDir).get().asFile
 
-    inputs.dir(cppDir)
+    inputs.dir(sourceDir)
     outputs.dir(buildDir)
 
-    commandLine("cmake", "-B", buildDir.absolutePath, "-S", cppDir.absolutePath)
+    commandLine(
+        "cmake",
+        "-DRATS_BUILD_TESTS=OFF",
+        "-DRATS_BUILD_CLIENT=OFF",
+        "-DRATS_SHARED_LIBRARY=ON",
+        "-DRATS_STATIC_LIBRARY=OFF",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-B", buildDir.absolutePath,
+        "-S", sourceDir.absolutePath
+    )
 }
 
 val cmakeBuild = tasks.register<Exec>("cmakeBuild") {
@@ -52,31 +63,23 @@ val cmakeBuild = tasks.register<Exec>("cmakeBuild") {
 
     dependsOn(cmakeGenerate)
 
-    val buildDir = layout.buildDirectory.dir("cmake-jvm").get().asFile
+    val buildDir = layout.buildDirectory.dir(cxxBuildDir).get().asFile
     inputs.dir(buildDir)
 
-    commandLine("cmake", "--build", buildDir.absolutePath)
+    commandLine("cmake", "--build", buildDir.absolutePath, "--parallel")
 }
 
-val buildJvmNativeLib = tasks.register("buildJvmNativeLib") {
-    description = "Copy binary into resources"
+val buildJvmNativeLib = tasks.register<Copy>("buildJvmNativeLib") {
+    description = "Copy shared library into resources"
     dependsOn(cmakeBuild)
 
-    val buildDir = layout.buildDirectory.dir("cmake-jvm").get().asFile
-    val resourceDir = file("src/jvmMain/resources/native")
-
-    inputs.dir(buildDir)
-    outputs.dir(resourceDir)
-
-    doLast {
-        copy {
-            from(buildDir)
-            into(resourceDir)
-            include("*.so", "*.dylib", "*.dll")
-        }
+    from(layout.buildDirectory.dir("$cxxBuildDir/lib")) {
+        include("librats.so")
     }
+
+    into(layout.projectDirectory.dir("src/jvmMain/resources"))
 }
 
 tasks.named("jvmProcessResources") {
     dependsOn(buildJvmNativeLib)
-}*/
+}
