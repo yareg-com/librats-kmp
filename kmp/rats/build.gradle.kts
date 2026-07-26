@@ -43,7 +43,9 @@ val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
     val sourceDir = file("../..")
     val buildDir = layout.buildDirectory.dir(cxxBuildDir).get().asFile
 
-    inputs.dir(sourceDir)
+    inputs.file(file("$sourceDir/CMakeLists.txt"))
+    inputs.dir(file("$sourceDir/src"))
+    inputs.dir(file("$sourceDir/tests"))
     outputs.dir(buildDir)
 
     commandLine(
