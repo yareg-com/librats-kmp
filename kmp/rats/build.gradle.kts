@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.android)
@@ -36,22 +38,29 @@ kotlin {
 }
 
 val cmake: String by lazy {
-    val sdkDir = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+    //val sdkDir = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+
+    val sdkDir = Properties().run {
+        load(rootProject.file("local.properties").inputStream())
+        getProperty("sdk.dir")
+    }
 
     if (sdkDir != null) {
+        println("Found Android SDK: $sdkDir")
         val path = file("$sdkDir/cmake")
 
         if (path.exists()) {
+            println("Found cmake path: $path")
             val binary = path.listFiles()?.maxOrNull()?.resolve("bin/cmake")
 
             if (binary?.exists() == true) {
-                println("Using Android SDK cmake!")
+                println("Using cmake from Android SDK")
                 return@lazy binary.absolutePath
             }
         }
     }
 
-    println("Using Android SDK cmake!")
+    println("Using system cmake")
     "cmake"
 }
 
