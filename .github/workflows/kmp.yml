@@ -35,9 +35,10 @@ jobs:
           java-version: '21'
         
       - name: Publish to GitHub Packages
-        run: cd kmp
-        run: chmod +x gradlew
-        run: ./gradlew publish
+        run: |
+          cd kmp
+          chmod +x gradlew
+          ./gradlew publish
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}    
