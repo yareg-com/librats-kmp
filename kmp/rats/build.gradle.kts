@@ -22,8 +22,6 @@ kotlin {
         minSdk = 21
         compileSdk = libs.versions.android.sdk.compile.get().toInt()
         buildToolsVersion = libs.versions.android.build.tools.get()
-
-        //publishLibraryVariants("release")
     }
 
     sourceSets {
@@ -37,31 +35,78 @@ kotlin {
     }
 }
 
-val cmake: String by lazy {
-    //val sdkDir = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
-
-    val sdkDir = Properties().run {
-        load(rootProject.file("local.properties").inputStream())
-        getProperty("sdk.dir")
+val androidSdkDir by lazy {
+    System.getenv("ANDROID_HOME") ?:
+    System.getenv("ANDROID_SDK_ROOT") ?:
+    Properties().run {
+        println("Looking for local.properies...")
+        try {
+            load(rootProject.file("local.properties").inputStream())
+            getProperty("sdk.dir")
+        } catch (_: Exception) {
+            println("Failed to find local.properies")
+            null
+        }
+    }.also {
+        if (it != null) {
+            println("Found Android SDK: $it")
+        }
     }
+}
 
-    if (sdkDir != null) {
-        println("Found Android SDK: $sdkDir")
-        val path = file("$sdkDir/cmake")
+val androidNdkDir by lazy {
+    androidSdkDir?.let {
+        val path = file("$it/ndk")
+
+        if (path.exists()) {
+            println("Found NDK path: $path")
+            val latestNdk = path.listFiles()?.filter { file -> file.isDirectory}?.maxOrNull()
+
+            if (latestNdk?.exists() == true) {
+                println("Found latest NDK path: $latestNdk")
+                latestNdk
+            } else null
+        } else null
+    }
+}
+
+val cmake: String by lazy {
+    androidSdkDir?.let {
+        val path = file("$it/cmake")
 
         if (path.exists()) {
             println("Found cmake path: $path")
             val binary = path.listFiles()?.maxOrNull()?.resolve("bin/cmake")
 
             if (binary?.exists() == true) {
-                println("Using cmake from Android SDK")
-                return@lazy binary.absolutePath
-            }
-        }
+                println("Using cmake from Android SDK: $binary")
+                binary.absolutePath
+            } else null
+        } else null
+    } ?: "cmake".also {
+        println("Using system cmake")
+    }
+}
+
+fun findNdkBinary(name: String): String? = androidNdkDir?.let {
+    val binary = it.walkTopDown().firstOrNull { file ->
+        file.isFile &&
+                (file.name == name || file.name == "$name.exe") &&
+                file.parentFile?.name == "bin"
     }
 
-    println("Using system cmake")
-    "cmake"
+    if (binary?.exists() == true) {
+        println("Using $name from Android SDK: $binary")
+        binary.absolutePath
+    } else null
+}
+
+val cCompiler: String? by lazy {
+    findNdkBinary("clang")
+}
+
+val cxxCompiler: String? by lazy {
+    findNdkBinary("clang++")
 }
 
 val cxxBuildDir = "intermediates/cxx"
@@ -77,7 +122,7 @@ val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
     inputs.dir(file("$sourceDir/tests"))
     outputs.dir(buildDir)
 
-    commandLine(
+    val args = mutableListOf(
         cmake,
         "-DRATS_BUILD_TESTS=OFF",
         "-DRATS_BUILD_CLIENT=OFF",
@@ -87,6 +132,15 @@ val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
         "-B", buildDir.absolutePath,
         "-S", sourceDir.absolutePath
     )
+
+    cCompiler?.let { c ->
+        cxxCompiler?.let { cxx ->
+            args.add("-DCMAKE_C_COMPILER=$c")
+            args.add("-DCMAKE_CXX_COMPILER=$cxx")
+        }
+    }
+
+    commandLine(args)
 }
 
 val cmakeBuild = tasks.register<Exec>("cmakeBuild") {
