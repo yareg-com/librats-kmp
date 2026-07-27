@@ -35,6 +35,19 @@ kotlin {
     }
 }
 
+publishing {
+    repositories {
+        maven {
+            name = "GitHub Packages"
+            url = uri("https://maven.pkg.github.com/yareg-com/librats-kmp")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
+
 val androidSdkDir by lazy {
     System.getenv("ANDROID_HOME") ?:
     System.getenv("ANDROID_SDK_ROOT") ?:
