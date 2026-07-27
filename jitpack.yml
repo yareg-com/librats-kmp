@@ -1,7 +1,7 @@
 jdk:
   - openjdk21
 before_install:
-  - yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-  - yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "cmake;3.22.1"
+  - yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses || true
+  - yes | $ANDROID_HOME/tools/bin/sdkmanager "cmake;3.22.1"
   - cd kmp
   - echo "sdk.dir=$ANDROID_HOME" > local.properties
