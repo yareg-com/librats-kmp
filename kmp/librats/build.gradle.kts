@@ -38,7 +38,7 @@ kotlin {
 publishing {
     repositories {
         maven {
-            name = "GitHubPackages"
+            name = "GitHub-Packages"
             url = uri("https://maven.pkg.github.com/yareg-com/librats-kmp")
             credentials {
                 username = System.getenv("GITHUB_ACTOR")
