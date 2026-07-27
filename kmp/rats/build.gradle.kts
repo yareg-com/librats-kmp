@@ -88,25 +88,27 @@ val cmake: String by lazy {
     }
 }
 
-fun findNdkBinary(name: String): String? = androidNdkDir?.let {
-    val binary = it.walkTopDown().firstOrNull { file ->
+fun ndkBinary(
+    name: String
+): String? = androidNdkDir?.let {
+    it.walkTopDown().firstOrNull { file ->
         file.isFile &&
-                (file.name == name || file.name == "$name.exe") &&
-                file.parentFile?.name == "bin"
+        (file.name == name || file.name == "$name.exe") &&
+        file.parentFile?.name == "bin"
+    }?.run {
+        if (exists()) {
+            println("Using $name from Android NDK: $this")
+            absolutePath
+        } else null
     }
-
-    if (binary?.exists() == true) {
-        println("Using $name from Android SDK: $binary")
-        binary.absolutePath
-    } else null
 }
 
 val cCompiler: String? by lazy {
-    findNdkBinary("clang")
+    ndkBinary("clang")
 }
 
 val cxxCompiler: String? by lazy {
-    findNdkBinary("clang++")
+    ndkBinary("clang++")
 }
 
 val cxxBuildDir = "intermediates/cxx"
