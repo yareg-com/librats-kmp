@@ -12,15 +12,21 @@ actual fun loadLibrary(
         it.readAllBytes().decodeToString().trim()//.take(12)
     } ?: error("Unable to get resource: $libName.sha256")
 
-    val libFile = File(getCacheDir(name), "$hash/$libName")
+    File(getCacheDir(name), "$hash/$libName").run {
+        if (!exists()) {
+            RatsClient.javaClass.getResourceAsStream("/$libName")?.use { binary ->
+                parentFile?.mkdirs()
 
-    if (!libFile.exists()) {
-        RatsClient.javaClass.getResourceAsStream("/$libName")?.use {
-            it.copyTo(libFile.outputStream())
-        } ?: error("Unable to get resource: $libName")
+                binary.use { input ->
+                    outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            } ?: error("Unable to get resource: $libName")
+        }
+
+        System.load(absolutePath)
     }
-
-    System.load(libFile.absolutePath)
 }
 
 private fun getCacheDir(
