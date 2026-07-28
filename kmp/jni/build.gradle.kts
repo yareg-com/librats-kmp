@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
+    id("maven-publish")
 }
 
 android {
@@ -19,6 +20,19 @@ android {
         cmake {
             path = file("../../android/src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
+        }
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHub-Packages"
+            url = uri("https://maven.pkg.github.com/yareg-com/librats-kmp")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
         }
     }
 }
