@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.android)
@@ -136,6 +138,14 @@ val buildJvmNativeLib = tasks.register<Copy>("buildJvmNativeLib") {
                 "Task 'buildJvmNativeLib' failed: $artifactFileName was not found or copied into ${destinationDir.absolutePath}"
             )
         }
+
+        val bytes = file(targetFile).readBytes()
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+            //.take(16)
+
+        file("${targetFile.absolutePath}.sha256").writeText(hash)
     }
 }
 

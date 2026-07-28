@@ -1,25 +1,26 @@
 package com.librats
 
 import java.io.File
-import java.nio.file.Files
 
+@Suppress("UnsafeDynamicallyLoadedCode")
 actual fun loadLibrary(
     name: String
 ) {
-    val libName = System.mapLibraryName(name) // "librats" -> "librats.so" on Linux
-    val libFile = File(getCacheDir(name), libName)
+    val libName = System.mapLibraryName(name) // "rats_jni" -> "librats_jni.so" on Linux
+
+    val hash = RatsClient.javaClass.getResourceAsStream("/$libName.sha256")?.use {
+        it.readAllBytes().decodeToString().trim()//.take(12)
+    } ?: error("Unable to get resource: $libName.sha256")
+
+    val libFile = File(getCacheDir(name), "$hash/$libName")
 
     if (!libFile.exists()) {
-        val stream = RatsClient.javaClass.getResourceAsStream("/$libName") ?: error(
-            "Could not find $libName in JAR resources"
-        )
-
-        stream.use { input ->
-            Files.copy(input, libFile.toPath())
-        }
+        RatsClient.javaClass.getResourceAsStream("/$libName")?.use {
+            it.copyTo(libFile.outputStream())
+        } ?: error("Unable to get resource: $libName")
     }
 
-    System.loadLibrary(libFile.absolutePath)
+    System.load(libFile.absolutePath)
 }
 
 private fun getCacheDir(
@@ -28,13 +29,14 @@ private fun getCacheDir(
     val userHome = System.getProperty("user.home")
     val xdgCache = System.getenv("XDG_CACHE_HOME")
 
-    val parent = when {
-        !xdgCache.isNullOrEmpty() -> File(xdgCache)
-        userHome != null          -> File(userHome, ".cache")
-        else                      -> File(System.getProperty("java.io.tmpdir"))
-    }
-
-    return File(parent, "$appName/lib").apply {
+    return File(
+        when {
+            !xdgCache.isNullOrEmpty() -> File(xdgCache)
+            userHome != null          -> File(userHome, ".cache")
+            else                      -> File(System.getProperty("java.io.tmpdir"))
+        },
+        "$appName/lib"
+    ).apply {
         if (!exists()) mkdirs()
     }
 }
