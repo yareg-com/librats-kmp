@@ -37,7 +37,7 @@ afterEvaluate {
                 from(components["release"])
 
                 groupId = "com.github.yareg-com"
-                artifactId = "jni"
+                artifactId = "librats-jni"
                 version = project.findProperty("version")?.toString() ?: "SNAPSHOT"
             }
         }
