@@ -49,10 +49,16 @@ publishing {
     }
 }
 
+val javaHome by lazy {
+    System.getenv("JAVA_HOME").also {
+        println("JAVA_HOME = $it")
+    }
+}
+
 val androidSdkDir by lazy {
     System.getenv("ANDROID_HOME") ?:
-    System.getenv("ANDROID_SDK_ROOT") ?:
-    Properties().run {
+    System.getenv("ANDROID_SDK_ROOT") //?:
+    /*Properties().run {
         println("Looking for local.properies...")
         try {
             load(rootProject.file("local.properties").inputStream())
@@ -65,7 +71,7 @@ val androidSdkDir by lazy {
         if (it != null) {
             println("Found Android SDK: $it")
         }
-    }
+    }*/
 }
 
 val androidNdkDir by lazy {
@@ -135,8 +141,6 @@ val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
 
     inputs.file(file("$sourceDir/CMakeLists.txt"))
     inputs.file(file("$sourceDir/librats_jni.cpp"))
-    //inputs.dir(file("$sourceDir/src"))
-    //inputs.dir(file("$sourceDir/tests"))
     outputs.dir(buildDir)
 
     val args = mutableListOf(
@@ -146,6 +150,7 @@ val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
         "-DRATS_SHARED_LIBRARY=ON",
         "-DRATS_STATIC_LIBRARY=OFF",
         "-DCMAKE_BUILD_TYPE=Release",
+        "-DJAVA_HOME=$javaHome",
         "-B", buildDir.absolutePath,
         "-S", sourceDir.absolutePath
     )
@@ -175,8 +180,8 @@ val buildJvmNativeLib = tasks.register<Copy>("buildJvmNativeLib") {
     description = "Copy shared library into resources"
     dependsOn(cmakeBuild)
 
-    from(layout.buildDirectory.dir("$cxxBuildDir/lib")) {
-        include("librats.so")
+    from(layout.buildDirectory.dir(cxxBuildDir)) {
+        include("librats_jni.so")
     }
 
     into(layout.projectDirectory.dir("src/jvmMain/resources"))
