@@ -23,14 +23,13 @@ android {
         }
     }
 
-    /*publishing {
+    publishing {
         singleVariant("release") {
             withSourcesJar()
         }
-    }*/
+    }
 }
 
-/*
 publishing {
     repositories {
         maven {
@@ -42,4 +41,4 @@ publishing {
             }
         }
     }
-}*/
+}
