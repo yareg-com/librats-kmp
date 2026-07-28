@@ -39,7 +39,9 @@ jobs:
         run: |
           cd kmp
           chmod +x gradlew
-          ./gradlew publish
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          ./gradlew publish -Pversion="$SHORT_SHA"
         env:
           GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}    
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}

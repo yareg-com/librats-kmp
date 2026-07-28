@@ -7,6 +7,7 @@ plugins {
 }
 
 group = "com.github.yareg-com"
+version = project.findProperty("version")?.toString() ?: "SNAPSHOT"
 
 kotlin {
     compilerOptions {
