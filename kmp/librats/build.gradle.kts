@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.android)
@@ -49,16 +47,108 @@ publishing {
     }
 }
 
-val javaHome by lazy {
-    System.getenv("JAVA_HOME").also {
-        println("JAVA_HOME = $it")
+val cmake by lazy { "cmake" }
+val cppBuildDir by lazy { "intermediates/cpp" }
+val artifactFileName by lazy { "librats_jni.so" }
+
+//----------------------------------------------------------------------------------------------------------------------
+
+val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
+    description = "Generate build files"
+
+    val sourceDir = layout.projectDirectory.dir("src/jvmMain/cpp").asFile
+    val buildDir = layout.buildDirectory.dir(cppBuildDir).get().asFile
+
+    inputs.file(file("$sourceDir/CMakeLists.txt"))
+    inputs.file(file("$sourceDir/librats_jni.cpp"))
+    outputs.dir(buildDir)
+
+    val args = mutableListOf(
+        cmake,
+//        "-DRATS_BUILD_TESTS=OFF",
+//        "-DRATS_BUILD_CLIENT=OFF",
+//        "-DRATS_SHARED_LIBRARY=ON",
+//        "-DRATS_STATIC_LIBRARY=OFF",
+//        "-DCMAKE_BUILD_TYPE=Release",
+//        "-DJAVA_HOME=",
+        "-B", buildDir.absolutePath,
+        "-S", sourceDir.absolutePath
+    )
+
+//    cCompiler?.let { c ->
+//        cxxCompiler?.let { cxx ->
+//            args.add("-DCMAKE_C_COMPILER=$c")
+//            args.add("-DCMAKE_CXX_COMPILER=$cxx")
+//        }
+//    }
+
+    commandLine(args)
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+val cmakeBuild = tasks.register<Exec>("cmakeBuild") {
+    description = "Build $artifactFileName"
+    dependsOn(cmakeGenerate)
+
+    val buildDir = layout.buildDirectory.dir(cppBuildDir)
+    inputs.dir(buildDir)
+    outputs.dir(buildDir)
+
+    commandLine(
+        cmake,
+        "--build", buildDir.get().asFile.absolutePath,
+        "--parallel"
+    )
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+val buildJvmNativeLib = tasks.register<Copy>("buildJvmNativeLib") {
+    description = "Copy $artifactFileName into resources"
+    dependsOn(cmakeBuild)
+
+    val sourcePath = layout.buildDirectory.dir(cppBuildDir)
+
+    doFirst {
+        val inputFiles = fileTree(sourcePath) {
+            include(artifactFileName)
+        }
+
+        if (inputFiles.isEmpty) {
+            throw GradleException(
+                "Task 'buildJvmNativeLib' failed: $artifactFileName was not found in ${sourcePath.get().asFile.absolutePath}"
+            )
+        }
+    }
+
+    from(sourcePath) {
+        include(artifactFileName)
+    }
+
+    into(layout.projectDirectory.dir("src/jvmMain/resources"))
+
+    doLast {
+        val targetFile = destinationDir.resolve(artifactFileName)
+
+        if (!targetFile.exists()) {
+            throw GradleException(
+                "Task 'buildJvmNativeLib' failed: $artifactFileName was not found or copied into ${destinationDir.absolutePath}"
+            )
+        }
     }
 }
 
-val androidSdkDir by lazy {
+//----------------------------------------------------------------------------------------------------------------------
+
+tasks.named("jvmProcessResources") {
+    dependsOn(buildJvmNativeLib)
+}
+
+/*val androidSdkDir by lazy {
     System.getenv("ANDROID_HOME") ?:
     System.getenv("ANDROID_SDK_ROOT") //?:
-    /*Properties().run {
+    *//*Properties().run {
         println("Looking for local.properies...")
         try {
             load(rootProject.file("local.properties").inputStream())
@@ -71,7 +161,7 @@ val androidSdkDir by lazy {
         if (it != null) {
             println("Found Android SDK: $it")
         }
-    }*/
+    }*//*
 }
 
 val androidNdkDir by lazy {
@@ -129,64 +219,4 @@ val cCompiler: String? by lazy {
 
 val cxxCompiler: String? by lazy {
     ndkBinary("clang++")
-}
-
-val cxxBuildDir = "intermediates/cxx"
-
-val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
-    description = "Generate build files"
-
-    val sourceDir = layout.projectDirectory.dir("src/jvmMain/cpp").asFile//file("../..")
-    val buildDir = layout.buildDirectory.dir(cxxBuildDir).get().asFile
-
-    inputs.file(file("$sourceDir/CMakeLists.txt"))
-    inputs.file(file("$sourceDir/librats_jni.cpp"))
-    outputs.dir(buildDir)
-
-    val args = mutableListOf(
-        cmake,
-        "-DRATS_BUILD_TESTS=OFF",
-        "-DRATS_BUILD_CLIENT=OFF",
-        "-DRATS_SHARED_LIBRARY=ON",
-        "-DRATS_STATIC_LIBRARY=OFF",
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-DJAVA_HOME=$javaHome",
-        "-B", buildDir.absolutePath,
-        "-S", sourceDir.absolutePath
-    )
-
-    cCompiler?.let { c ->
-        cxxCompiler?.let { cxx ->
-            args.add("-DCMAKE_C_COMPILER=$c")
-            args.add("-DCMAKE_CXX_COMPILER=$cxx")
-        }
-    }
-
-    commandLine(args)
-}
-
-val cmakeBuild = tasks.register<Exec>("cmakeBuild") {
-    description = "Compile C++ code"
-
-    dependsOn(cmakeGenerate)
-
-    val buildDir = layout.buildDirectory.dir(cxxBuildDir).get().asFile
-    inputs.dir(buildDir)
-
-    commandLine(cmake, "--build", buildDir.absolutePath, "--parallel")
-}
-
-val buildJvmNativeLib = tasks.register<Copy>("buildJvmNativeLib") {
-    description = "Copy shared library into resources"
-    dependsOn(cmakeBuild)
-
-    from(layout.buildDirectory.dir(cxxBuildDir)) {
-        include("librats_jni.so")
-    }
-
-    into(layout.projectDirectory.dir("src/jvmMain/resources"))
-}
-
-tasks.named("jvmProcessResources") {
-    dependsOn(buildJvmNativeLib)
-}
+}*/
