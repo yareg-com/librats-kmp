@@ -130,12 +130,13 @@ val cxxBuildDir = "intermediates/cxx"
 val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
     description = "Generate build files"
 
-    val sourceDir = file("../..")
+    val sourceDir = layout.projectDirectory.dir("src/jvmMain/cpp").asFile//file("../..")
     val buildDir = layout.buildDirectory.dir(cxxBuildDir).get().asFile
 
     inputs.file(file("$sourceDir/CMakeLists.txt"))
-    inputs.dir(file("$sourceDir/src"))
-    inputs.dir(file("$sourceDir/tests"))
+    inputs.file(file("$sourceDir/librats_jni.cpp"))
+    //inputs.dir(file("$sourceDir/src"))
+    //inputs.dir(file("$sourceDir/tests"))
     outputs.dir(buildDir)
 
     val args = mutableListOf(
