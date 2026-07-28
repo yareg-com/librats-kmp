@@ -1,3 +1,3 @@
 package com.librats
 
-internal expect fun loadLibrary(name: String = "librats")
+internal expect fun loadLibrary(name: String = "rats")
