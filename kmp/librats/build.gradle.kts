@@ -51,7 +51,6 @@ publishing {
 
 val cmake by lazy { "cmake" }
 val cppBuildDir by lazy { "intermediates/cpp" }
-val artifactFileName by lazy { "librats_jni.so" }
 
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -90,7 +89,7 @@ val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
 //----------------------------------------------------------------------------------------------------------------------
 
 val cmakeBuild = tasks.register<Exec>("cmakeBuild") {
-    description = "Build $artifactFileName"
+    description = "Build shared library"
     dependsOn(cmakeGenerate)
 
     val buildDir = layout.buildDirectory.dir(cppBuildDir)
@@ -107,45 +106,42 @@ val cmakeBuild = tasks.register<Exec>("cmakeBuild") {
 //----------------------------------------------------------------------------------------------------------------------
 
 val buildJvmNativeLib = tasks.register<Copy>("buildJvmNativeLib") {
-    description = "Copy $artifactFileName into resources"
+    description = "Copy shared library into resources"
     dependsOn(cmakeBuild)
 
+    val libFile = "librats_jni.so"
     val sourcePath = layout.buildDirectory.dir(cppBuildDir)
 
     doFirst {
-        val inputFiles = fileTree(sourcePath) {
-            include(artifactFileName)
-        }
-
-        if (inputFiles.isEmpty) {
+        if (sourcePath.get().asFileTree.find { it.name == libFile } == null) {
             throw GradleException(
-                "Task 'buildJvmNativeLib' failed: $artifactFileName was not found in ${sourcePath.get().asFile.absolutePath}"
+                "Task 'buildJvmNativeLib' failed: $libFile was not found in ${sourcePath.get().asFile.absolutePath}"
             )
         }
     }
 
     from(sourcePath) {
-        include(artifactFileName)
+        include(libFile)
     }
 
     into(layout.projectDirectory.dir("src/jvmMain/resources"))
 
     doLast {
-        val targetFile = destinationDir.resolve(artifactFileName)
+        val targetFile = destinationDir.resolve(libFile)
 
         if (!targetFile.exists()) {
             throw GradleException(
-                "Task 'buildJvmNativeLib' failed: $artifactFileName was not found or copied into ${destinationDir.absolutePath}"
+                "Task 'buildJvmNativeLib' failed: $libFile was not found or copied into ${destinationDir.absolutePath}"
             )
         }
 
-        val bytes = file(targetFile).readBytes()
+        val bytes = targetFile.readBytes()
         val hash = MessageDigest.getInstance("SHA-256")
             .digest(bytes)
             .joinToString("") { "%02x".format(it) }
             //.take(16)
 
-        file("${targetFile.absolutePath}.sha256").writeText(hash)
+        project.file("${targetFile.absolutePath}.sha256").writeText(hash)
     }
 }
 

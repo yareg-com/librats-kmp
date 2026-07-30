@@ -1,20 +1,22 @@
 package com.librats
 
 import com.librats.subsystem.Discovery
+import com.librats.subsystem.Identity
 import com.librats.subsystem.Message
 import com.librats.subsystem.Peers
 import com.librats.subsystem.Topics
+import kotlin.Int
 
 class RatsNode(
-    port: Int = 0,
-    config: RatsNode.() -> Unit = { }
+    config: Config,
+    setup: RatsNode.() -> Unit = { }
 ) : AutoCloseable {
-    private val ptr: Long = RatsClient.nativeCreate(port).apply {
+    private val ptr: Long = create(config).apply {
         if (this == 0L) throw RatsException("Failed to create native rats node")
     }
 
     init {
-        config(this)
+        setup(this)
     }
 
     //------------------------------------------------------------------------------------------------------------------
@@ -22,6 +24,19 @@ class RatsNode(
     // LIFECYCLE
     //
     //------------------------------------------------------------------------------------------------------------------
+
+
+    fun create(
+        config: Config
+    ): Long = RatsClient.nativeCreateConfig(
+        listenPort = config.port,
+        enableListen = config.listen,
+        bindAddress = config.bindAddress,
+        security = config.security.id,
+        dataDir = config.dataDirectory,
+        protocol = config.protocol,
+        maxPeers = config.maxPeers
+    )
 
     /**
      * Starts the node: binds the listener and brings up enabled subsystems
@@ -47,35 +62,12 @@ class RatsNode(
 
     //------------------------------------------------------------------------------------------------------------------
     //
-    // IDENTITY
-    //
-    //------------------------------------------------------------------------------------------------------------------
-
-    /**
-     * @return the port the node is listening on
-     */
-
-    val port: Int
-        get() = RatsClient.nativeListenPort(ptr)
-
-    /**
-     * @return our self-certifying peer id as 64-char lowercase hex
-     */
-    val localId: String
-        get() = RatsClient.nativeLocalId(ptr)
-
-    /**
-     * @return the application protocol id bound into the handshake (e.g. "librats/1.0")
-     */
-
-    val protocol: String
-        get() = RatsClient.nativeProtocol(ptr)
-
-    //------------------------------------------------------------------------------------------------------------------
-    //
     // SUBSYSTEMS
     //
     //------------------------------------------------------------------------------------------------------------------
+
+    val identity: Identity
+        get() = Identity { ptr }
 
     val discovery: Discovery
         get() = Discovery { ptr }

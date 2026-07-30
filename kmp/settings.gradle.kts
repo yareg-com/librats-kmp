@@ -34,5 +34,5 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 include(
     ":jni",
     ":librats",
-    ":app"
+    //":app"
 )
