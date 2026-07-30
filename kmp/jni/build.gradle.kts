@@ -12,7 +12,12 @@ android {
         minSdk = 21
 
         ndk {
-            abiFilters.addAll(setOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86"))
+            abiFilters.addAll(setOf(
+                "arm64-v8a",
+                "armeabi-v7a",
+                "x86_64",
+                //"x86"
+            ))
         }
     }
 
