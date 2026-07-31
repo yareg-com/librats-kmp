@@ -74,11 +74,6 @@ public class RatsClient {
         public String protocol = null;
         /** Established-peer cap; 0 = unlimited. */
         public long maxPeers = 0;
-        /** DHT bootstrap routers as "host:port" strings, e.g.
-         *  "router.bittorrent.com:6881" or "[2001:db8::1]:25401". null/empty →
-         *  the built-in public BitTorrent DHT routers. Malformed entries are
-         *  skipped by the native layer. */
-        public String[] bootstrapNodes = null;
     }
 
     /**
@@ -108,8 +103,7 @@ public class RatsClient {
                 config.security,
                 config.dataDir,
                 config.protocol,
-                config.maxPeers,
-                config.bootstrapNodes);
+                config.maxPeers);
         if (nativePtr == 0) {
             throw new RatsException("Failed to create native rats node");
         }
@@ -241,16 +235,21 @@ public class RatsClient {
     /**
      * Enables DHT discovery. Call before start.
      *
-     * @param dhtPort      DHT port (0 = ephemeral)
-     * @param discoveryKey app namespace key (null = default)
+     * @param dhtPort       DHT port (0 = ephemeral)
+     * @param discoveryKey  app namespace key (null = default)
+     * @param bootstrapNodes DHT bootstrap routers as "host:port" strings,
+     *                       null/empty → built-in public BitTorrent DHT routers
+     * @param stunServers   STUN servers as "host:port" strings,
+     *                       null/empty → built-in public STUN servers
      */
-    public int enableDht(int dhtPort, String discoveryKey) {
-        return nativeEnableDht(nativePtr, dhtPort, discoveryKey);
+    public int enableDht(int dhtPort, String discoveryKey,
+                         String[] bootstrapNodes, String[] stunServers) {
+        return nativeEnableDht(nativePtr, dhtPort, discoveryKey, bootstrapNodes, stunServers);
     }
 
-    /** Enables DHT discovery with default port and key. */
+    /** Enables DHT discovery with default port, key, and servers. */
     public int enableDht() {
-        return enableDht(0, null);
+        return enableDht(0, null, null, null);
     }
 
     /** Enables local-network mDNS discovery. Call before start. */
@@ -470,7 +469,7 @@ public class RatsClient {
     private native long nativeCreate(int listenPort);
     private native long nativeCreateConfig(int listenPort, boolean enableListen, String bindAddress,
                                            int security, String dataDir, String protocol,
-                                           long maxPeers, String[] bootstrapNodes);
+                                           long maxPeers);
     private native void nativeDestroy(long ptr);
     private native int nativeStart(long ptr);
     private native void nativeStop(long ptr);
@@ -492,7 +491,8 @@ public class RatsClient {
     private native int nativeOnPeerConnected(long ptr, ConnectionCallback callback);
     private native int nativeOnPeerDisconnected(long ptr, DisconnectCallback callback);
 
-    private native int nativeEnableDht(long ptr, int dhtPort, String discoveryKey);
+    private native int nativeEnableDht(long ptr, int dhtPort, String discoveryKey,
+                                       String[] bootstrapNodes, String[] stunServers);
     private native int nativeEnableMdns(long ptr);
     private native int nativeEnablePortMapping(long ptr, boolean enableUpnp, boolean enableNatpmp);
 
