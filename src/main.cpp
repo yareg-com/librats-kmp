@@ -12,6 +12,8 @@
 //   --bind <addr>          bind address (default "::" = dual-stack). e.g. 0.0.0.0, 127.0.0.1, ::1
 //   --data <dir>           data directory (stable identity + reconnect/DHT store)
 //   --connect <host> <port>  dial a peer at startup (repeatable)
+//   --bootstrap <host:port>  DHT bootstrap router to seed the Kademlia table with
+//                            (repeatable; empty → built-in public routers)
 //   --no-dht               disable DHT peer discovery (IPv4 + IPv6)
 //   --no-mdns              disable mDNS (local-network) discovery
 //   --no-upnp              disable UPnP / NAT-PMP port mapping
@@ -35,6 +37,7 @@
 #include "subsystems/peer_exchange.h"
 #include "subsystems/reconnection.h"
 #include "core/address.h"
+#include "core/host_endpoint.h"
 #include "util/fs.h"
 #include "util/json.h"
 #include "util/logger.h"
@@ -154,7 +157,7 @@ int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "usage: " << argv[0] << " <listen_port> [--bind addr] [--data dir]"
                      " [--connect host port] [--no-dht] [--no-mdns] [--no-upnp] [--no-pex]"
-                     " [--no-reconnect] [--no-ping]"
+                     " [--no-reconnect] [--no-ping] [--bootstrap host:port]"
 #ifdef RATS_SEARCH_FEATURES
                      " [--no-bittorrent] [--bt-port port]"
 #endif
@@ -192,6 +195,13 @@ int main(int argc, char** argv) {
                 std::cerr << "--connect: '" << argv[i + 1] << "' is not a numeric IP address\n";
             i += 2;
         }
+        else if (arg == "--bootstrap" && i + 1 < argc) {
+            if (auto hp = HostEndpoint::parse(argv[i + 1]))
+                config.bootstrap_nodes.push_back(*hp);
+            else
+                std::cerr << "--bootstrap: '" << argv[i + 1] << "' is not host:port\n";
+            ++i;
+        }
         else if (arg == "--no-dht")       use_dht = false;
         else if (arg == "--no-mdns")      use_mdns = false;
         else if (arg == "--no-upnp")      use_upnp = false;
@@ -227,6 +237,7 @@ int main(int argc, char** argv) {
     if (use_dht) {
         DhtDiscovery::Config dc;
         dc.data_dir = config.data_dir;  // co-locate routing tables with identity + peers
+        dc.bootstrap_nodes = config.bootstrap_nodes;  // custom DHT seeds (empty → built-in routers)
         auto dht = std::make_unique<DhtDiscovery>(std::move(dc));
         sub.dht = dht.get();
         node.add_subsystem(std::move(dht));

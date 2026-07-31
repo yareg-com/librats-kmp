@@ -54,6 +54,18 @@ std::string big_payload(size_t n) {
 
 } // namespace
 
+// The built-in DHT bootstrap routers live on NodeConfig; they must be a usable
+// host:port set (the DHT resolves them per family when a node actually starts).
+TEST(NodeConfigTest, DefaultBootstrapNodesAreValid) {
+    const auto nodes = NodeConfig::default_bootstrap_nodes();
+    EXPECT_FALSE(nodes.empty());
+    for (const auto& n : nodes) {
+        EXPECT_FALSE(n.host.empty());
+        EXPECT_GT(n.port, 0);
+        EXPECT_LT(n.port, 65536);
+    }
+}
+
 // Connect, send on a named channel, get a reply — all encrypted end to end.
 TEST(NodeTest, ConnectAndEchoMessage) {
     Node server(server_config());

@@ -5,7 +5,7 @@
 // key, dialing whatever it finds — so two nodes sharing a key find each other
 // with no known addresses, across the open internet.
 //
-//   05_dht_discovery <listen_port> [discovery_key] [data_dir]
+//   05_dht_discovery <listen_port> [discovery_key] [data_dir] [--bootstrap host:port ...]
 //
 //   ./05_dht_discovery 9000 my-app-demo
 //   ./05_dht_discovery 9001 my-app-demo     # on another machine, same key
@@ -34,6 +34,16 @@ int main(int argc, char** argv) {
     config.listen_port  = static_cast<uint16_t>(std::stoi(argv[1]));
     config.bind_address = "::";
     if (argc >= 4) config.data_dir = argv[3];
+    // Optional DHT bootstrap routers: --bootstrap router.example.com:6881 (repeatable).
+    // When none are given, the built-in public BitTorrent routers are used.
+    for (int i = 4; i < argc; ++i) {
+        if (std::string(argv[i]) == "--bootstrap" && i + 1 < argc) {
+            if (auto hp = HostEndpoint::parse(argv[++i]))
+                config.bootstrap_nodes.push_back(*hp);
+            else
+                std::cerr << "ignoring bad --bootstrap target: " << argv[i] << "\n";
+        }
+    }
 
     Node node(config);
 
@@ -42,6 +52,7 @@ int main(int argc, char** argv) {
     DhtDiscovery::Config dc;
     if (argc >= 3) dc.discovery_key = argv[2];
     dc.data_dir = config.data_dir;  // co-locate the routing table with the identity
+    dc.bootstrap_nodes = config.bootstrap_nodes;  // custom seeds (empty → built-in routers)
     node.add_subsystem(std::make_unique<DhtDiscovery>(std::move(dc)));
 
     node.on_peer_connected([](const Peer& peer) {
