@@ -151,8 +151,15 @@ RATS_API rats_error_t rats_on(rats_t node, const char* channel, rats_message_cb 
 /* — optional subsystems (enable before start) — */
 
 /** DHT discovery. dht_port 0 = ephemeral; discovery_key namespaces the app
- *  (NULL → the node's protocol, so only same-protocol peers discover each other). */
-RATS_API rats_error_t rats_enable_dht(rats_t node, uint16_t dht_port, const char* discovery_key);
+ *  (NULL → the node's protocol, so only same-protocol peers discover each other).
+ *  bootstrap_nodes / stun_servers override the built-in defaults when non-NULL
+ *  (NULL-terminated arrays of "host:port" strings); NULL → built-in defaults.
+ *  Entries are borrowed only for the duration of the call; malformed entries
+ *  are skipped. */
+RATS_API rats_error_t rats_enable_dht(rats_t node, uint16_t dht_port,
+                                       const char* discovery_key,
+                                       const char* const* bootstrap_nodes,
+                                       const char* const* stun_servers);
 /** Local-network mDNS discovery. */
 RATS_API rats_error_t rats_enable_mdns(rats_t node);
 /** Automatic NAT port forwarding for the listen port (UPnP IGD + NAT-PMP).

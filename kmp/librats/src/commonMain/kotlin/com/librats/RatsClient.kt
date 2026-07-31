@@ -28,9 +28,7 @@ object RatsClient {
         security: Int,
         dataDir: String?,
         protocol: String?,
-        maxPeers: Long,
-        bootstrapNodes: Array<String>?,
-        stunServers: Array<String>?
+        maxPeers: Long
     ): Long
 
     external fun nativeCreate(listenPort: Int): Long
@@ -69,7 +67,13 @@ object RatsClient {
     //
     //------------------------------------------------------------------------------------------------------------------
 
-    external fun nativeEnableDht(ptr: Long, dhtPort: Int, discoveryKey: String?): Int
+    external fun nativeEnableDht(
+        ptr: Long,
+        dhtPort: Int,
+        discoveryKey: String?,
+        bootstrapNodes: Array<String>?,
+        stunServers: Array<String>?
+    ): Int
     external fun nativeEnableMdns(ptr: Long): Int
     external fun nativeEnablePortMapping(ptr: Long, enableUpnp: Boolean, enableNatpmp: Boolean): Int
 

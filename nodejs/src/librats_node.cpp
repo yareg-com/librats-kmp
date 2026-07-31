@@ -468,7 +468,7 @@ void RatsClient::EnableDht(const Napi::CallbackInfo& info) {
         key = info[1].As<Napi::String>().Utf8Value();
         key_ptr = key.c_str();
     }
-    throw_on_error(env, rats_enable_dht(node_, dht_port, key_ptr));
+    throw_on_error(env, rats_enable_dht(node_, dht_port, key_ptr, nullptr, nullptr));
 }
 
 void RatsClient::EnableMdns(const Napi::CallbackInfo& info) {

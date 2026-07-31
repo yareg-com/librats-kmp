@@ -277,7 +277,8 @@ class RatsClient:
     def enable_dht(self, dht_port: int = 0, discovery_key: Optional[str] = None) -> None:
         """Enable DHT discovery. ``dht_port`` 0 = ephemeral."""
         check_error(
-            self._lib.lib.rats_enable_dht(self._handle, dht_port, _b(discovery_key)),
+            self._lib.lib.rats_enable_dht(self._handle, dht_port, _b(discovery_key),
+                                          None, None),
             "Enabling DHT")
 
     def enable_mdns(self) -> None:

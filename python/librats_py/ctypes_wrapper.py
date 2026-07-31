@@ -196,7 +196,7 @@ class LibratsCtypes:
         lib.rats_on.restype = c_int
 
         # --- discovery / port mapping subsystems ---
-        lib.rats_enable_dht.argtypes = [c_void_p, c_uint16, c_char_p]
+        lib.rats_enable_dht.argtypes = [c_void_p, c_uint16, c_char_p, POINTER(c_char_p), POINTER(c_char_p)]
         lib.rats_enable_dht.restype = c_int
 
         lib.rats_enable_mdns.argtypes = [c_void_p]

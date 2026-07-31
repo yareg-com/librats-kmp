@@ -245,17 +245,33 @@ rats_error_t rats_on(rats_t node, const char* channel, rats_message_cb cb, void*
 
 /* — discovery / NAT subsystems — */
 
-rats_error_t rats_enable_dht(rats_t node, uint16_t dht_port, const char* discovery_key) {
+rats_error_t rats_enable_dht(rats_t node, uint16_t dht_port, const char* discovery_key,
+                             const char* const* bootstrap_nodes,
+                             const char* const* stun_servers) {
     auto* h = as_handle(node);
     if (h->started) return RATS_ERR_ALREADY_STARTED;
     if (h->dht_enabled) return RATS_OK;
     DhtDiscovery::Config config;
     config.dht_port = dht_port;
     config.data_dir = h->data_dir;  // co-locate routing tables with identity (else cwd)
-    // Custom DHT seeds from the node config (empty → built-in public routers).
-    config.bootstrap_nodes = h->node->config().bootstrap_nodes;
-    // Custom STUN servers from the node config (empty → built-in public servers).
-    config.stun_servers = h->node->config().stun_servers;
+    // Custom DHT seeds: caller-supplied list takes precedence over NodeConfig.
+    if (bootstrap_nodes) {
+        for (size_t i = 0; bootstrap_nodes[i]; ++i) {
+            if (auto hp = HostEndpoint::parse(bootstrap_nodes[i]))
+                config.bootstrap_nodes.push_back(*hp);
+        }
+    } else {
+        config.bootstrap_nodes = h->node->config().bootstrap_nodes;
+    }
+    // Custom STUN servers: caller-supplied list takes precedence over NodeConfig.
+    if (stun_servers) {
+        for (size_t i = 0; stun_servers[i]; ++i) {
+            if (auto hp = HostEndpoint::parse(stun_servers[i]))
+                config.stun_servers.push_back(*hp);
+        }
+    } else {
+        config.stun_servers = h->node->config().stun_servers;
+    }
     if (discovery_key) config.discovery_key = discovery_key;
     h->node->add_subsystem(std::make_unique<DhtDiscovery>(std::move(config)));
     h->dht_enabled = true;

@@ -240,7 +240,7 @@ TEST(NodeCApiTest, ConfigBootstrapNodesAccepted) {
     ASSERT_NE(node, nullptr);
     // Enabling DHT consumes the node config's bootstrap nodes (seeds the
     // routing table at start); the enable must succeed pre-start.
-    ASSERT_EQ(rats_enable_dht(node, 0, nullptr), RATS_OK);
+    ASSERT_EQ(rats_enable_dht(node, 0, nullptr, nullptr, nullptr), RATS_OK);
     rats_destroy(node);
 }
 

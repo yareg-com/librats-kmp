@@ -36,9 +36,7 @@ class RatsNode(
             security = security.id,
             dataDir = dataDirectory,
             protocol = protocol,
-            maxPeers = maxPeers,
-            bootstrapNodes = bootstrapNodes?.toTypedArray(),
-            stunServers = stunServers?.toTypedArray()
+            maxPeers = maxPeers
         )
     }
 

@@ -445,7 +445,8 @@ Java_com_librats_RatsClient_nativeEnableDht(JNIEnv* env, jobject, jlong ptr, jin
                                             jstring discovery_key) {
     std::string key = toCString(env, discovery_key);
     return rats_enable_dht(node_of(ptr), static_cast<uint16_t>(dht_port),
-                           discovery_key ? key.c_str() : nullptr);
+                           discovery_key ? key.c_str() : nullptr,
+                           nullptr, nullptr);
 }
 
 JNIEXPORT jint JNICALL
