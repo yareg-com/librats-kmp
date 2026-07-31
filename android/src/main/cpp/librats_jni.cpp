@@ -279,10 +279,10 @@ Java_com_librats_RatsClient_nativeCreateConfig(JNIEnv* env, jobject, jint listen
             bootstrap_strs.push_back(toCString(env, js));
             env->DeleteLocalRef(js);
         }
-        bootstrap_ptrs.reserve(bootstrap_strs.size());
+        bootstrap_ptrs.reserve(bootstrap_strs.size() + 1);  // +1 for the NULL terminator
         for (const std::string& s : bootstrap_strs) bootstrap_ptrs.push_back(s.c_str());
+        bootstrap_ptrs.push_back(nullptr);  // NULL-terminated: the C side reads until NULL
         cfg.bootstrap_nodes = bootstrap_ptrs.data();
-        cfg.bootstrap_nodes_count = bootstrap_ptrs.size();
     }
 
     return reinterpret_cast<jlong>(rats_create_config(&cfg));

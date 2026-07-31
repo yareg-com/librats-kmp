@@ -111,7 +111,6 @@ rats_config_t rats_config_default(void) {
     c.protocol               = nullptr;
     c.max_peers              = 0;
     c.bootstrap_nodes        = nullptr;
-    c.bootstrap_nodes_count  = 0;
     return c;
 }
 
@@ -127,15 +126,12 @@ rats_t rats_create_config(const rats_config_t* cfg) {
         if (cfg->protocol)         config.protocol         = cfg->protocol;
         config.max_peers = cfg->max_peers;
 
-        // DHT bootstrap routers as "host:port" strings (or "[ipv6]:port"). A
-        // malformed entry is skipped — with no error channel on create, the
-        // rest of the config (and node) must still work.
-        if (cfg->bootstrap_nodes && cfg->bootstrap_nodes_count > 0) {
-            config.bootstrap_nodes.reserve(cfg->bootstrap_nodes_count);
-            for (size_t i = 0; i < cfg->bootstrap_nodes_count; ++i) {
-                const char* node = cfg->bootstrap_nodes[i];
-                if (!node) continue;
-                if (auto hp = HostEndpoint::parse(node))
+        // DHT bootstrap routers as "host:port" strings (or "[ipv6]:port"),
+        // NULL-terminated. A malformed entry is skipped — with no error channel
+        // on create, the rest of the config (and node) must still work.
+        if (cfg->bootstrap_nodes) {
+            for (size_t i = 0; cfg->bootstrap_nodes[i]; ++i) {
+                if (auto hp = HostEndpoint::parse(cfg->bootstrap_nodes[i]))
                     config.bootstrap_nodes.push_back(*hp);
             }
         }

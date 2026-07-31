@@ -235,7 +235,6 @@ TEST(NodeCApiTest, ConfigBootstrapNodesAccepted) {
         nullptr,                 // null slot → skipped
     };
     cfg.bootstrap_nodes = nodes;
-    cfg.bootstrap_nodes_count = 4;
 
     rats_t node = rats_create_config(&cfg);
     ASSERT_NE(node, nullptr);

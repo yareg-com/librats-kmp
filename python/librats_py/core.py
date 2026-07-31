@@ -86,10 +86,9 @@ class RatsClient:
         if bootstrap_nodes:
             encoded = [_b(n) for n in bootstrap_nodes]
             self._cfg_keepalive.extend(encoded)          # keep the bytes alive
-            node_array = (c_char_p * len(encoded))(*encoded)
+            node_array = (c_char_p * (len(encoded) + 1))(*encoded, None)  # NULL-terminated
             self._cfg_keepalive.append(node_array)       # keep the array alive
             cfg.bootstrap_nodes = node_array
-            cfg.bootstrap_nodes_count = len(encoded)
 
         self._handle = self._lib.lib.rats_create_config(byref(cfg))
         if not self._handle:
