@@ -111,6 +111,7 @@ rats_config_t rats_config_default(void) {
     c.protocol               = nullptr;
     c.max_peers              = 0;
     c.bootstrap_nodes        = nullptr;
+    c.stun_servers           = nullptr;
     return c;
 }
 
@@ -133,6 +134,14 @@ rats_t rats_create_config(const rats_config_t* cfg) {
             for (size_t i = 0; cfg->bootstrap_nodes[i]; ++i) {
                 if (auto hp = HostEndpoint::parse(cfg->bootstrap_nodes[i]))
                     config.bootstrap_nodes.push_back(*hp);
+            }
+        }
+
+        // STUN servers as "host:port" strings, same format as bootstrap_nodes.
+        if (cfg->stun_servers) {
+            for (size_t i = 0; cfg->stun_servers[i]; ++i) {
+                if (auto hp = HostEndpoint::parse(cfg->stun_servers[i]))
+                    config.stun_servers.push_back(*hp);
             }
         }
     }
@@ -245,6 +254,8 @@ rats_error_t rats_enable_dht(rats_t node, uint16_t dht_port, const char* discove
     config.data_dir = h->data_dir;  // co-locate routing tables with identity (else cwd)
     // Custom DHT seeds from the node config (empty → built-in public routers).
     config.bootstrap_nodes = h->node->config().bootstrap_nodes;
+    // Custom STUN servers from the node config (empty → built-in public servers).
+    config.stun_servers = h->node->config().stun_servers;
     if (discovery_key) config.discovery_key = discovery_key;
     h->node->add_subsystem(std::make_unique<DhtDiscovery>(std::move(config)));
     h->dht_enabled = true;

@@ -50,6 +50,7 @@ class RatsClient:
         protocol: Optional[str] = None,
         max_peers: int = 0,
         bootstrap_nodes: Optional[List[str]] = None,
+        stun_servers: Optional[List[str]] = None,
     ):
         """Create a node.
 
@@ -89,6 +90,13 @@ class RatsClient:
             node_array = (c_char_p * (len(encoded) + 1))(*encoded, None)  # NULL-terminated
             self._cfg_keepalive.append(node_array)       # keep the array alive
             cfg.bootstrap_nodes = node_array
+
+        if stun_servers:
+            encoded = [_b(n) for n in stun_servers]
+            self._cfg_keepalive.extend(encoded)
+            stun_array = (c_char_p * (len(encoded) + 1))(*encoded, None)
+            self._cfg_keepalive.append(stun_array)
+            cfg.stun_servers = stun_array
 
         self._handle = self._lib.lib.rats_create_config(byref(cfg))
         if not self._handle:

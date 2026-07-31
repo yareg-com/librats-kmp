@@ -238,6 +238,7 @@ int main(int argc, char** argv) {
         DhtDiscovery::Config dc;
         dc.data_dir = config.data_dir;  // co-locate routing tables with identity + peers
         dc.bootstrap_nodes = config.bootstrap_nodes;  // custom DHT seeds (empty → built-in routers)
+        dc.stun_servers = config.stun_servers;        // custom STUN servers (empty → built-in defaults)
         auto dht = std::make_unique<DhtDiscovery>(std::move(dc));
         sub.dht = dht.get();
         node.add_subsystem(std::move(dht));

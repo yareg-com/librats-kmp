@@ -250,7 +250,8 @@ Java_com_librats_RatsClient_nativeCreate(JNIEnv*, jobject, jint listen_port) {
 JNIEXPORT jlong JNICALL
 Java_com_librats_RatsClient_nativeCreateConfig(JNIEnv* env, jobject, jint listen_port,
         jboolean enable_listen, jstring bind_address, jint security, jstring data_dir,
-        jstring protocol, jlong max_peers, jobjectArray bootstrap_nodes) {
+        jstring protocol, jlong max_peers, jobjectArray bootstrap_nodes,
+        jobjectArray stun_servers) {
     rats_config_t cfg = rats_config_default();
     cfg.listen_port = static_cast<uint16_t>(listen_port);
     cfg.enable_listen = enable_listen ? 1 : 0;
@@ -283,6 +284,25 @@ Java_com_librats_RatsClient_nativeCreateConfig(JNIEnv* env, jobject, jint listen
         for (const std::string& s : bootstrap_strs) bootstrap_ptrs.push_back(s.c_str());
         bootstrap_ptrs.push_back(nullptr);  // NULL-terminated: the C side reads until NULL
         cfg.bootstrap_nodes = bootstrap_ptrs.data();
+    }
+
+    // STUN servers as "host:port" strings; null / empty → the built-in public
+    // STUN servers (NodeConfig::default_stun_servers).
+    std::vector<std::string> stun_strs;
+    std::vector<const char*> stun_ptrs;
+    if (stun_servers) {
+        const jsize count = env->GetArrayLength(stun_servers);
+        stun_strs.reserve(static_cast<size_t>(count));
+        for (jsize i = 0; i < count; ++i) {
+            jstring js = static_cast<jstring>(env->GetObjectArrayElement(stun_servers, i));
+            if (!js) continue;
+            stun_strs.push_back(toCString(env, js));
+            env->DeleteLocalRef(js);
+        }
+        stun_ptrs.reserve(stun_strs.size() + 1);
+        for (const std::string& s : stun_strs) stun_ptrs.push_back(s.c_str());
+        stun_ptrs.push_back(nullptr);
+        cfg.stun_servers = stun_ptrs.data();
     }
 
     return reinterpret_cast<jlong>(rats_create_config(&cfg));

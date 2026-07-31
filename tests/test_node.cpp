@@ -66,6 +66,18 @@ TEST(NodeConfigTest, DefaultBootstrapNodesAreValid) {
     }
 }
 
+// The built-in STUN servers live on NodeConfig; they must be a usable
+// host:port set (the DhtDiscovery resolves them per family at probe time).
+TEST(NodeConfigTest, DefaultStunServersAreValid) {
+    const auto servers = NodeConfig::default_stun_servers();
+    EXPECT_FALSE(servers.empty());
+    for (const auto& s : servers) {
+        EXPECT_FALSE(s.host.empty());
+        EXPECT_GT(s.port, 0);
+        EXPECT_LT(s.port, 65536);
+    }
+}
+
 // Connect, send on a named channel, get a reply — all encrypted end to end.
 TEST(NodeTest, ConnectAndEchoMessage) {
     Node server(server_config());

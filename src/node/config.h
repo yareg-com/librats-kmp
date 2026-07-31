@@ -79,6 +79,25 @@ struct NodeConfig {
             {"dht.aelitis.com", 6881},
         };
     }
+
+    /// STUN servers the DhtDiscovery subsystem probes at startup to learn the
+    /// node's public (reflexive) IP for BEP-42 node-id derivation.  Hostnames
+    /// are resolved per address family.  Empty → NodeConfig::default_stun_servers().
+    std::vector<HostEndpoint> stun_servers = {};
+
+    /// The built-in public STUN servers, used when stun_servers is empty.
+    static std::vector<HostEndpoint> default_stun_servers() {
+        return {
+            {"stun.l.google.com", 19302},
+            {"stun1.l.google.com", 19302},
+            {"stun2.l.google.com", 19302},
+            {"stun3.l.google.com", 19302},
+            {"stun4.l.google.com", 19302},
+            {"stun.stunprotocol.org", 3478},
+            {"stun.voip.blackberry.com", 3478},
+            {"stun.sipgate.net", 3478},
+        };
+    }
 };
 
 } // namespace librats

@@ -82,6 +82,13 @@ typedef struct {
      * (NodeConfig::default_bootstrap_nodes). Entries are borrowed only for the
      * duration of the create call; malformed entries are skipped. */
     const char* const* bootstrap_nodes;       /* NULL-terminated; NULL → built-in defaults */
+
+    /* STUN servers (host:port) the DhtDiscovery subsystem probes at startup to
+     * learn the node's public IP for BEP-42 node-id derivation.  NULL-terminated
+     * array; NULL → the built-in public STUN servers
+     * (NodeConfig::default_stun_servers). Entries are borrowed only for the
+     * duration of the create call; malformed entries are skipped. */
+    const char* const* stun_servers;          /* NULL-terminated; NULL → built-in defaults */
 } rats_config_t;
 
 /** A config pre-filled with the library defaults (listening, Noise, ephemeral

@@ -45,6 +45,7 @@ class RatsConfig(Structure):
         ("protocol", c_char_p),          # const char* (NULL → "librats/1.0")
         ("max_peers", c_size_t),         # size_t (0 = unlimited)
         ("bootstrap_nodes", POINTER(c_char_p)),   # const char* const* ("host:port"; NULL-terminated; NULL → defaults)
+        ("stun_servers", POINTER(c_char_p)),      # const char* const* ("host:port"; NULL-terminated; NULL → defaults)
     ]
 
 

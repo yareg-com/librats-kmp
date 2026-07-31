@@ -203,6 +203,21 @@ RatsClient::RatsClient(const Napi::CallbackInfo& info)
             c.bootstrap_nodes = bootstrap_ptrs.data();
         }
 
+        // STUN servers as "host:port" strings; empty → built-in defaults.
+        std::vector<std::string> stun_strs;
+        std::vector<const char*> stun_ptrs;
+        if (cfg.Has("stunServers") && cfg.Get("stunServers").IsArray()) {
+            Napi::Array arr = cfg.Get("stunServers").As<Napi::Array>();
+            for (uint32_t i = 0; i < arr.Length(); ++i) {
+                Napi::Value v = arr.Get(i);
+                if (v.IsString()) stun_strs.push_back(v.As<Napi::String>().Utf8Value());
+            }
+            stun_ptrs.reserve(stun_strs.size() + 1);
+            for (const std::string& s : stun_strs) stun_ptrs.push_back(s.c_str());
+            stun_ptrs.push_back(nullptr);
+            c.stun_servers = stun_ptrs.data();
+        }
+
         node_ = rats_create_config(&c);
     } else {
         int port = 0;

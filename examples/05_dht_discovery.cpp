@@ -53,6 +53,7 @@ int main(int argc, char** argv) {
     if (argc >= 3) dc.discovery_key = argv[2];
     dc.data_dir = config.data_dir;  // co-locate the routing table with the identity
     dc.bootstrap_nodes = config.bootstrap_nodes;  // custom seeds (empty → built-in routers)
+    dc.stun_servers = config.stun_servers;        // custom STUN servers (empty → built-in defaults)
     node.add_subsystem(std::make_unique<DhtDiscovery>(std::move(dc)));
 
     node.on_peer_connected([](const Peer& peer) {

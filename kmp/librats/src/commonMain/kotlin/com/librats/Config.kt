@@ -8,5 +8,6 @@ class Config(
     val dataDirectory: String = "",          // "" = ephemeral identity; else identity.key persists
     val protocol: String = "librats/1.0",    // app id bound into the handshake; must match to connect
     val maxPeers: Long = 0,                  // 0 = unlimited (guards inbound only)
-    val bootstrapNodes: List<String>? = null // Custom bootstrap nodes list, default used if null
+    val bootstrapNodes: List<String>? = null, // Custom bootstrap nodes list, default used if null
+    val stunServers: List<String>? = null     // Custom STUN servers list, default used if null
 )
