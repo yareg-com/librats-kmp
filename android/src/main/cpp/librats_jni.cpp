@@ -250,8 +250,7 @@ Java_com_librats_RatsClient_nativeCreate(JNIEnv*, jobject, jint listen_port) {
 JNIEXPORT jlong JNICALL
 Java_com_librats_RatsClient_nativeCreateConfig(JNIEnv* env, jobject, jint listen_port,
         jboolean enable_listen, jstring bind_address, jint security, jstring data_dir,
-        jstring protocol, jlong max_peers, jobjectArray bootstrap_nodes,
-        jobjectArray stun_servers) {
+        jstring protocol, jlong max_peers) {
     rats_config_t cfg = rats_config_default();
     cfg.listen_port = static_cast<uint16_t>(listen_port);
     cfg.enable_listen = enable_listen ? 1 : 0;
@@ -264,46 +263,6 @@ Java_com_librats_RatsClient_nativeCreateConfig(JNIEnv* env, jobject, jint listen
     cfg.bind_address = bind_address ? bind.c_str() : nullptr;
     cfg.data_dir = data_dir ? ddir.c_str() : nullptr;
     cfg.protocol = protocol ? proto.c_str() : nullptr;
-
-    // DHT bootstrap routers as "host:port" strings (or "[ipv6]:port"); null /
-    // empty → the built-in public BitTorrent DHT routers. The strings stay alive
-    // in the vectors below for the duration of rats_create_config (the struct
-    // borrows them only for that call).
-    std::vector<std::string> bootstrap_strs;
-    std::vector<const char*> bootstrap_ptrs;
-    if (bootstrap_nodes) {
-        const jsize count = env->GetArrayLength(bootstrap_nodes);
-        bootstrap_strs.reserve(static_cast<size_t>(count));
-        for (jsize i = 0; i < count; ++i) {
-            jstring js = static_cast<jstring>(env->GetObjectArrayElement(bootstrap_nodes, i));
-            if (!js) continue;  // tolerate null slots
-            bootstrap_strs.push_back(toCString(env, js));
-            env->DeleteLocalRef(js);
-        }
-        bootstrap_ptrs.reserve(bootstrap_strs.size() + 1);  // +1 for the NULL terminator
-        for (const std::string& s : bootstrap_strs) bootstrap_ptrs.push_back(s.c_str());
-        bootstrap_ptrs.push_back(nullptr);  // NULL-terminated: the C side reads until NULL
-        cfg.bootstrap_nodes = bootstrap_ptrs.data();
-    }
-
-    // STUN servers as "host:port" strings; null / empty → the built-in public
-    // STUN servers (NodeConfig::default_stun_servers).
-    std::vector<std::string> stun_strs;
-    std::vector<const char*> stun_ptrs;
-    if (stun_servers) {
-        const jsize count = env->GetArrayLength(stun_servers);
-        stun_strs.reserve(static_cast<size_t>(count));
-        for (jsize i = 0; i < count; ++i) {
-            jstring js = static_cast<jstring>(env->GetObjectArrayElement(stun_servers, i));
-            if (!js) continue;
-            stun_strs.push_back(toCString(env, js));
-            env->DeleteLocalRef(js);
-        }
-        stun_ptrs.reserve(stun_strs.size() + 1);
-        for (const std::string& s : stun_strs) stun_ptrs.push_back(s.c_str());
-        stun_ptrs.push_back(nullptr);
-        cfg.stun_servers = stun_ptrs.data();
-    }
 
     return reinterpret_cast<jlong>(rats_create_config(&cfg));
 }
@@ -442,11 +401,49 @@ Java_com_librats_RatsClient_nativeOnPeerDisconnected(JNIEnv* env, jobject, jlong
 
 JNIEXPORT jint JNICALL
 Java_com_librats_RatsClient_nativeEnableDht(JNIEnv* env, jobject, jlong ptr, jint dht_port,
-                                            jstring discovery_key) {
+                                            jstring discovery_key,
+                                            jobjectArray bootstrap_nodes,
+                                            jobjectArray stun_servers) {
     std::string key = toCString(env, discovery_key);
+
+    // Parse bootstrap_nodes (same pattern as nativeCreateConfig).
+    std::vector<std::string> bootstrap_strs;
+    std::vector<const char*> bootstrap_ptrs;
+    if (bootstrap_nodes) {
+        const jsize count = env->GetArrayLength(bootstrap_nodes);
+        bootstrap_strs.reserve(static_cast<size_t>(count));
+        for (jsize i = 0; i < count; ++i) {
+            jstring js = static_cast<jstring>(env->GetObjectArrayElement(bootstrap_nodes, i));
+            if (!js) continue;
+            bootstrap_strs.push_back(toCString(env, js));
+            env->DeleteLocalRef(js);
+        }
+        bootstrap_ptrs.reserve(bootstrap_strs.size() + 1);
+        for (const std::string& s : bootstrap_strs) bootstrap_ptrs.push_back(s.c_str());
+        bootstrap_ptrs.push_back(nullptr);
+    }
+
+    // Parse stun_servers.
+    std::vector<std::string> stun_strs;
+    std::vector<const char*> stun_ptrs;
+    if (stun_servers) {
+        const jsize count = env->GetArrayLength(stun_servers);
+        stun_strs.reserve(static_cast<size_t>(count));
+        for (jsize i = 0; i < count; ++i) {
+            jstring js = static_cast<jstring>(env->GetObjectArrayElement(stun_servers, i));
+            if (!js) continue;
+            stun_strs.push_back(toCString(env, js));
+            env->DeleteLocalRef(js);
+        }
+        stun_ptrs.reserve(stun_strs.size() + 1);
+        for (const std::string& s : stun_strs) stun_ptrs.push_back(s.c_str());
+        stun_ptrs.push_back(nullptr);
+    }
+
     return rats_enable_dht(node_of(ptr), static_cast<uint16_t>(dht_port),
                            discovery_key ? key.c_str() : nullptr,
-                           nullptr, nullptr);
+                           bootstrap_ptrs.empty() ? nullptr : bootstrap_ptrs.data(),
+                           stun_ptrs.empty() ? nullptr : stun_ptrs.data());
 }
 
 JNIEXPORT jint JNICALL
