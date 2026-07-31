@@ -188,6 +188,21 @@ RatsClient::RatsClient(const Napi::CallbackInfo& info)
         if (cfg.Has("maxPeers"))
             c.max_peers = static_cast<size_t>(cfg.Get("maxPeers").As<Napi::Number>().Int64Value());
 
+        // DHT bootstrap routers as "host:port" strings; empty → built-in defaults.
+        std::vector<std::string> bootstrap_strs;
+        std::vector<const char*> bootstrap_ptrs;
+        if (cfg.Has("bootstrapNodes") && cfg.Get("bootstrapNodes").IsArray()) {
+            Napi::Array arr = cfg.Get("bootstrapNodes").As<Napi::Array>();
+            for (uint32_t i = 0; i < arr.Length(); ++i) {
+                Napi::Value v = arr.Get(i);
+                if (v.IsString()) bootstrap_strs.push_back(v.As<Napi::String>().Utf8Value());
+            }
+            bootstrap_ptrs.reserve(bootstrap_strs.size() + 1);  // +1 for the NULL terminator
+            for (const std::string& s : bootstrap_strs) bootstrap_ptrs.push_back(s.c_str());
+            bootstrap_ptrs.push_back(nullptr);  // NULL-terminated: the C side reads until NULL
+            c.bootstrap_nodes = bootstrap_ptrs.data();
+        }
+
         node_ = rats_create_config(&c);
     } else {
         int port = 0;

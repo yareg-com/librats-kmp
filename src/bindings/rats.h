@@ -74,6 +74,14 @@ typedef struct {
     const char*     data_dir;         /* persistent state dir; NULL/"" → ephemeral identity each run */
     const char*     protocol;         /* handshake app id (e.g. "myapp/1.0"); NULL → "librats/1.0" */
     size_t          max_peers;        /* established-peer cap; 0 = unlimited */
+
+    /* DHT bootstrap routers the DhtDiscovery subsystem seeds its Kademlia
+     * routing table with, as "host:port" strings (e.g. "router.bittorrent.com:6881"
+     * or a bracketed literal "[2001:db8::1]:25401"). NULL-terminated array;
+     * NULL → the built-in public BitTorrent DHT routers
+     * (NodeConfig::default_bootstrap_nodes). Entries are borrowed only for the
+     * duration of the create call; malformed entries are skipped. */
+    const char* const* bootstrap_nodes;       /* NULL-terminated; NULL → built-in defaults */
 } rats_config_t;
 
 /** A config pre-filled with the library defaults (listening, Noise, ephemeral

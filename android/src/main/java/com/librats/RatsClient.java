@@ -74,6 +74,11 @@ public class RatsClient {
         public String protocol = null;
         /** Established-peer cap; 0 = unlimited. */
         public long maxPeers = 0;
+        /** DHT bootstrap routers as "host:port" strings, e.g.
+         *  "router.bittorrent.com:6881" or "[2001:db8::1]:25401". null/empty →
+         *  the built-in public BitTorrent DHT routers. Malformed entries are
+         *  skipped by the native layer. */
+        public String[] bootstrapNodes = null;
     }
 
     /**
@@ -103,7 +108,8 @@ public class RatsClient {
                 config.security,
                 config.dataDir,
                 config.protocol,
-                config.maxPeers);
+                config.maxPeers,
+                config.bootstrapNodes);
         if (nativePtr == 0) {
             throw new RatsException("Failed to create native rats node");
         }
@@ -464,7 +470,7 @@ public class RatsClient {
     private native long nativeCreate(int listenPort);
     private native long nativeCreateConfig(int listenPort, boolean enableListen, String bindAddress,
                                            int security, String dataDir, String protocol,
-                                           long maxPeers);
+                                           long maxPeers, String[] bootstrapNodes);
     private native void nativeDestroy(long ptr);
     private native int nativeStart(long ptr);
     private native void nativeStop(long ptr);

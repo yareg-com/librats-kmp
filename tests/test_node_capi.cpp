@@ -223,6 +223,27 @@ TEST(NodeCApiTest, ConfigDataDirPersistsIdentity) {
     std::filesystem::remove_all(dir);
 }
 
+// rats_config_t accepts DHT bootstrap routers as "host:port" strings and the
+// node still constructs when one entry is malformed (it is skipped, not fatal).
+// Proves the construction-time config bridge handles the variable-length list.
+TEST(NodeCApiTest, ConfigBootstrapNodesAccepted) {
+    rats_config_t cfg = rats_config_default();
+    const char* nodes[] = {
+        "router.bittorrent.com:6881",
+        "[2001:db8::1]:25401",   // bracketed IPv6 literal
+        "not-an-endpoint",       // malformed → skipped, not fatal
+        nullptr,                 // null slot → skipped
+    };
+    cfg.bootstrap_nodes = nodes;
+
+    rats_t node = rats_create_config(&cfg);
+    ASSERT_NE(node, nullptr);
+    // Enabling DHT consumes the node config's bootstrap nodes (seeds the
+    // routing table at start); the enable must succeed pre-start.
+    ASSERT_EQ(rats_enable_dht(node, 0, nullptr), RATS_OK);
+    rats_destroy(node);
+}
+
 // Reconnection subsystem: an added target is actively dialed, so the node
 // connects without an explicit rats_connect. Error codes guard the contract.
 TEST(NodeCApiTest, ReconnectDialsTarget) {

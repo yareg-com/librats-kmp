@@ -5,8 +5,11 @@
  * @brief Node construction options.
  */
 
+#include "core/host_endpoint.h"
+
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace librats {
 
@@ -58,6 +61,24 @@ struct NodeConfig {
     /// node's EventBus so subsystems can renew port mappings, re-run STUN and
     /// re-announce. Costs one mostly-idle monitor thread. See node/host_events.h.
     bool enable_network_monitor = true;
+
+    /// DHT bootstrap routers (host:port) the DhtDiscovery subsystem seeds the
+    /// Kademlia routing table with when it starts. Hostnames are resolved per
+    /// address family at send time. Empty → NodeConfig::default_bootstrap_nodes().
+    std::vector<HostEndpoint> bootstrap_nodes = {};
+
+    /// The built-in public BitTorrent DHT bootstrap routers, used when
+    /// bootstrap_nodes is empty. dht.libtorrent.org also has an AAAA record,
+    /// giving IPv6 a reliable entry point.
+    static std::vector<HostEndpoint> default_bootstrap_nodes() {
+        return {
+            {"router.bittorrent.com", 6881},
+            {"dht.transmissionbt.com", 6881},
+            {"router.utorrent.com", 6881},
+            {"dht.libtorrent.org", 25401},
+            {"dht.aelitis.com", 6881},
+        };
+    }
 };
 
 } // namespace librats

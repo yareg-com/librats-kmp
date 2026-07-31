@@ -250,7 +250,7 @@ Java_com_librats_RatsClient_nativeCreate(JNIEnv*, jobject, jint listen_port) {
 JNIEXPORT jlong JNICALL
 Java_com_librats_RatsClient_nativeCreateConfig(JNIEnv* env, jobject, jint listen_port,
         jboolean enable_listen, jstring bind_address, jint security, jstring data_dir,
-        jstring protocol, jlong max_peers) {
+        jstring protocol, jlong max_peers, jobjectArray bootstrap_nodes) {
     rats_config_t cfg = rats_config_default();
     cfg.listen_port = static_cast<uint16_t>(listen_port);
     cfg.enable_listen = enable_listen ? 1 : 0;
@@ -263,6 +263,27 @@ Java_com_librats_RatsClient_nativeCreateConfig(JNIEnv* env, jobject, jint listen
     cfg.bind_address = bind_address ? bind.c_str() : nullptr;
     cfg.data_dir = data_dir ? ddir.c_str() : nullptr;
     cfg.protocol = protocol ? proto.c_str() : nullptr;
+
+    // DHT bootstrap routers as "host:port" strings (or "[ipv6]:port"); null /
+    // empty → the built-in public BitTorrent DHT routers. The strings stay alive
+    // in the vectors below for the duration of rats_create_config (the struct
+    // borrows them only for that call).
+    std::vector<std::string> bootstrap_strs;
+    std::vector<const char*> bootstrap_ptrs;
+    if (bootstrap_nodes) {
+        const jsize count = env->GetArrayLength(bootstrap_nodes);
+        bootstrap_strs.reserve(static_cast<size_t>(count));
+        for (jsize i = 0; i < count; ++i) {
+            jstring js = static_cast<jstring>(env->GetObjectArrayElement(bootstrap_nodes, i));
+            if (!js) continue;  // tolerate null slots
+            bootstrap_strs.push_back(toCString(env, js));
+            env->DeleteLocalRef(js);
+        }
+        bootstrap_ptrs.reserve(bootstrap_strs.size() + 1);  // +1 for the NULL terminator
+        for (const std::string& s : bootstrap_strs) bootstrap_ptrs.push_back(s.c_str());
+        bootstrap_ptrs.push_back(nullptr);  // NULL-terminated: the C side reads until NULL
+        cfg.bootstrap_nodes = bootstrap_ptrs.data();
+    }
 
     return reinterpret_cast<jlong>(rats_create_config(&cfg));
 }

@@ -103,13 +103,14 @@ const char* rats_error_str(rats_error_t err) {
 
 rats_config_t rats_config_default(void) {
     rats_config_t c;
-    c.listen_port      = 0;
-    c.enable_listen    = 1;
-    c.bind_address     = nullptr;
-    c.security         = RATS_SECURITY_NOISE;
-    c.data_dir         = nullptr;
-    c.protocol         = nullptr;
-    c.max_peers        = 0;
+    c.listen_port            = 0;
+    c.enable_listen          = 1;
+    c.bind_address           = nullptr;
+    c.security               = RATS_SECURITY_NOISE;
+    c.data_dir               = nullptr;
+    c.protocol               = nullptr;
+    c.max_peers              = 0;
+    c.bootstrap_nodes        = nullptr;
     return c;
 }
 
@@ -124,6 +125,16 @@ rats_t rats_create_config(const rats_config_t* cfg) {
         if (cfg->data_dir)         config.data_dir         = cfg->data_dir;
         if (cfg->protocol)         config.protocol         = cfg->protocol;
         config.max_peers = cfg->max_peers;
+
+        // DHT bootstrap routers as "host:port" strings (or "[ipv6]:port"),
+        // NULL-terminated. A malformed entry is skipped — with no error channel
+        // on create, the rest of the config (and node) must still work.
+        if (cfg->bootstrap_nodes) {
+            for (size_t i = 0; cfg->bootstrap_nodes[i]; ++i) {
+                if (auto hp = HostEndpoint::parse(cfg->bootstrap_nodes[i]))
+                    config.bootstrap_nodes.push_back(*hp);
+            }
+        }
     }
     return make_handle(std::move(config));
 }
@@ -232,6 +243,8 @@ rats_error_t rats_enable_dht(rats_t node, uint16_t dht_port, const char* discove
     DhtDiscovery::Config config;
     config.dht_port = dht_port;
     config.data_dir = h->data_dir;  // co-locate routing tables with identity (else cwd)
+    // Custom DHT seeds from the node config (empty → built-in public routers).
+    config.bootstrap_nodes = h->node->config().bootstrap_nodes;
     if (discovery_key) config.discovery_key = discovery_key;
     h->node->add_subsystem(std::make_unique<DhtDiscovery>(std::move(config)));
     h->dht_enabled = true;

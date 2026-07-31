@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include "dht/dht.h"
+#include "node/config.h"
 #include "core/socket.h"
 #include <thread>
 #include <chrono>
@@ -113,6 +114,13 @@ TEST_F(DhtTest, BootstrapNodesTest) {
         EXPECT_GT(node.port, 0);
         EXPECT_LT(node.port, 65536);
     }
+}
+
+// NodeConfig is the single source of truth for the built-in DHT bootstrap routers;
+// the standalone DhtClient convenience accessor must mirror it.
+TEST_F(DhtTest, DefaultBootstrapNodesMatchNodeConfig) {
+    EXPECT_EQ(DhtClient::get_default_bootstrap_nodes(),
+              NodeConfig::default_bootstrap_nodes());
 }
 
 // Test peer discovery (basic functionality)
