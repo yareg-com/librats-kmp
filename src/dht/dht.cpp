@@ -5,6 +5,7 @@
 #include "dht/persistence.h"
 #include "dht/bep42.h"
 #include "dht/log.h"
+#include "node/config.h"
 #include "util/network_utils.h"
 #include "util/fs.h"
 
@@ -290,7 +291,10 @@ bool DhtClient::verify_node_id_for_ip(const NodeId& id, const std::string& ip) {
 }
 
 std::vector<HostEndpoint> DhtClient::get_default_bootstrap_nodes() {
-    return dht::Node::default_bootstrap_nodes();
+    // NodeConfig owns the built-in list (single source of truth) so that a node
+    // configured through NodeConfig::bootstrap_nodes overrides the defaults here
+    // too — DhtDiscovery falls back to this only when no seeds were configured.
+    return NodeConfig::default_bootstrap_nodes();
 }
 
 size_t DhtClient::get_routing_table_size() const {

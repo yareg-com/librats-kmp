@@ -402,10 +402,49 @@ Java_com_librats_RatsClient_nativeOnPeerDisconnected(JNIEnv* env, jobject, jlong
 
 JNIEXPORT jint JNICALL
 Java_com_librats_RatsClient_nativeEnableDht(JNIEnv* env, jobject, jlong ptr, jint dht_port,
-                                            jstring discovery_key) {
+                                            jstring discovery_key,
+                                            jobjectArray bootstrap_nodes,
+                                            jobjectArray stun_servers) {
     std::string key = toCString(env, discovery_key);
+
+    // Parse bootstrap_nodes (same pattern as nativeCreateConfig).
+    std::vector<std::string> bootstrap_strs;
+    std::vector<const char*> bootstrap_ptrs;
+    if (bootstrap_nodes) {
+        const jsize count = env->GetArrayLength(bootstrap_nodes);
+        bootstrap_strs.reserve(static_cast<size_t>(count));
+        for (jsize i = 0; i < count; ++i) {
+            jstring js = static_cast<jstring>(env->GetObjectArrayElement(bootstrap_nodes, i));
+            if (!js) continue;
+            bootstrap_strs.push_back(toCString(env, js));
+            env->DeleteLocalRef(js);
+        }
+        bootstrap_ptrs.reserve(bootstrap_strs.size() + 1);
+        for (const std::string& s : bootstrap_strs) bootstrap_ptrs.push_back(s.c_str());
+        bootstrap_ptrs.push_back(nullptr);
+    }
+
+    // Parse stun_servers.
+    std::vector<std::string> stun_strs;
+    std::vector<const char*> stun_ptrs;
+    if (stun_servers) {
+        const jsize count = env->GetArrayLength(stun_servers);
+        stun_strs.reserve(static_cast<size_t>(count));
+        for (jsize i = 0; i < count; ++i) {
+            jstring js = static_cast<jstring>(env->GetObjectArrayElement(stun_servers, i));
+            if (!js) continue;
+            stun_strs.push_back(toCString(env, js));
+            env->DeleteLocalRef(js);
+        }
+        stun_ptrs.reserve(stun_strs.size() + 1);
+        for (const std::string& s : stun_strs) stun_ptrs.push_back(s.c_str());
+        stun_ptrs.push_back(nullptr);
+    }
+
     return rats_enable_dht(node_of(ptr), static_cast<uint16_t>(dht_port),
-                           discovery_key ? key.c_str() : nullptr);
+                           discovery_key ? key.c_str() : nullptr,
+                           bootstrap_ptrs.empty() ? nullptr : bootstrap_ptrs.data(),
+                           stun_ptrs.empty() ? nullptr : stun_ptrs.data());
 }
 
 JNIEXPORT jint JNICALL

@@ -5,8 +5,11 @@
  * @brief Node construction options.
  */
 
+#include "core/host_endpoint.h"
+
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace librats {
 
@@ -58,6 +61,43 @@ struct NodeConfig {
     /// node's EventBus so subsystems can renew port mappings, re-run STUN and
     /// re-announce. Costs one mostly-idle monitor thread. See node/host_events.h.
     bool enable_network_monitor = true;
+
+    /// DHT bootstrap routers (host:port) the DhtDiscovery subsystem seeds the
+    /// Kademlia routing table with when it starts. Hostnames are resolved per
+    /// address family at send time. Empty → NodeConfig::default_bootstrap_nodes().
+    std::vector<HostEndpoint> bootstrap_nodes = {};
+
+    /// The built-in public BitTorrent DHT bootstrap routers, used when
+    /// bootstrap_nodes is empty. dht.libtorrent.org also has an AAAA record,
+    /// giving IPv6 a reliable entry point.
+    static std::vector<HostEndpoint> default_bootstrap_nodes() {
+        return {
+            {"router.bittorrent.com", 6881},
+            {"dht.transmissionbt.com", 6881},
+            {"router.utorrent.com", 6881},
+            {"dht.libtorrent.org", 25401},
+            {"dht.aelitis.com", 6881},
+        };
+    }
+
+    /// STUN servers the DhtDiscovery subsystem probes at startup to learn the
+    /// node's public (reflexive) IP for BEP-42 node-id derivation.  Hostnames
+    /// are resolved per address family.  Empty → NodeConfig::default_stun_servers().
+    std::vector<HostEndpoint> stun_servers = {};
+
+    /// The built-in public STUN servers, used when stun_servers is empty.
+    static std::vector<HostEndpoint> default_stun_servers() {
+        return {
+            {"stun.l.google.com", 19302},
+            {"stun1.l.google.com", 19302},
+            {"stun2.l.google.com", 19302},
+            {"stun3.l.google.com", 19302},
+            {"stun4.l.google.com", 19302},
+            {"stun.stunprotocol.org", 3478},
+            {"stun.voip.blackberry.com", 3478},
+            {"stun.sipgate.net", 3478},
+        };
+    }
 };
 
 } // namespace librats

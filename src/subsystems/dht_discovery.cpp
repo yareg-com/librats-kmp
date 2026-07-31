@@ -1,5 +1,6 @@
 #include "subsystems/dht_discovery.h"
 #include "node/node_context.h"
+#include "node/config.h"
 #include "node/host_events.h"
 #include "nat/stun.h"
 #include "sha1.h"
@@ -16,11 +17,8 @@ int hex_val(char c) {
     return 0;
 }
 
-// A couple of well-known public STUN servers, tried in order. Kept short so a
-// total-outage startup costs at most a few timeouts before we fall back to voting.
-std::vector<HostEndpoint> default_stun_servers() {
-    return { HostEndpoint("stun.l.google.com", 19302), HostEndpoint("stun1.l.google.com", 19302) };
-}
+/// The built-in public STUN servers are defined in NodeConfig::default_stun_servers()
+/// (single source of truth, same pattern as bootstrap_nodes).
 
 // The configured bind literal only applies to its own family; the other family
 // binds the wildcard. An empty config means wildcard for both.
@@ -136,8 +134,8 @@ std::string DhtDiscovery::external_address() const {
 // Runs on the loop thread; stop() joins that thread before resetting dht_, so the
 // dht_ access here can never touch a freed client.
 void DhtDiscovery::probe_external_ip() {
-    std::vector<HostEndpoint> servers = config_.stun_servers.empty() ? default_stun_servers()
-                                                                      : config_.stun_servers;
+    std::vector<HostEndpoint> servers = config_.stun_servers.empty() ? NodeConfig::default_stun_servers()
+                                                                    : config_.stun_servers;
     StunClient stun;
     const int timeout = static_cast<int>(config_.stun_timeout.count());
     for (const HostEndpoint& s : servers) {

@@ -15,7 +15,6 @@
  */
 
 #include "core/address.h"
-#include "core/host_endpoint.h"
 #include "dht/dos_blocker.h"
 #include "dht/find_peers.h"
 #include "dht/id.h"
@@ -93,8 +92,6 @@ public:
     RoutingTable& routing_table() noexcept { return table_; }
     const RoutingTable& routing_table() const noexcept { return table_; }
     std::size_t active_lookups() const noexcept { return lookups_.size(); }
-
-    static std::vector<HostEndpoint> default_bootstrap_nodes();
 
 private:
     // incoming query handlers (server side)

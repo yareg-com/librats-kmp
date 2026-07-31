@@ -359,18 +359,6 @@ void Node::set_external_ip(const IpAddress& ip) {
                     << short_hex(self_) << " (BEP 42)");
 }
 
-std::vector<HostEndpoint> Node::default_bootstrap_nodes() {
-    // Hostnames resolve per-family at send time; dht.libtorrent.org also has an AAAA
-    // record, giving IPv6 a reliable entry point.
-    return {
-        {"router.bittorrent.com", 6881},
-        {"dht.transmissionbt.com", 6881},
-        {"router.utorrent.com", 6881},
-        {"dht.libtorrent.org", 25401},
-        {"dht.aelitis.com", 6881},
-    };
-}
-
 #ifdef RATS_SEARCH_FEATURES
 
 namespace {

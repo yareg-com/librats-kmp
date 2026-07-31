@@ -71,6 +71,9 @@ public:
     void set_external_ip(const std::string& ip);
     std::string get_external_address() const;
     static bool verify_node_id_for_ip(const NodeId& id, const std::string& ip);
+    /// The built-in public BitTorrent DHT bootstrap routers — the same list
+    /// NodeConfig::default_bootstrap_nodes() returns (the config is the single
+    /// source of truth; this is kept as a convenience for standalone DhtClient use).
     static std::vector<HostEndpoint> get_default_bootstrap_nodes();
 
     size_t get_routing_table_size() const;

@@ -12,14 +12,17 @@ class Discovery(
         @param key  - app namespace key (null = default)
         @return {@link #OK} on success, otherwise a {@code rats_error_t} code
     */
-
     fun enableDht(
         port: Int = 0,
-        key: String? = null
+        key: String? = null,
+        bootstrapNodes: List<String>? = null, // Custom bootstrap nodes list, default used if null
+        stunServers: List<String>? = null     // Custom STUN servers list, default used if null
     ): Int = RatsClient.nativeEnableDht(
         ptr = ptr(),
         dhtPort = port,
-        discoveryKey = key
+        discoveryKey = key,
+        bootstrapNodes = bootstrapNodes?.toTypedArray(),
+        stunServers = stunServers?.toTypedArray()
     )
 
     //------------------------------------------------------------------------------------------------------------------
@@ -28,7 +31,6 @@ class Discovery(
         Enables local-network mDNS discovery. Call before node start
         @return {@link #OK} on success, otherwise a {@code rats_error_t} code
     */
-
     fun enableMdns(): Int = RatsClient.nativeEnableMdns(ptr())
 
     //------------------------------------------------------------------------------------------------------------------
@@ -37,7 +39,6 @@ class Discovery(
         Enables automatic NAT port forwarding for the listen port. Call before node start
         @return {@link #OK} on success, otherwise a {@code rats_error_t} code
     */
-
     fun enablePortMapping(
         upnp: Boolean,
         natPmp: Boolean

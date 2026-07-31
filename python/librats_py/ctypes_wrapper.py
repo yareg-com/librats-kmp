@@ -44,6 +44,8 @@ class RatsConfig(Structure):
         ("data_dir", c_char_p),          # const char*
         ("protocol", c_char_p),          # const char* (NULL → "librats/1.0")
         ("max_peers", c_size_t),         # size_t (0 = unlimited)
+        ("bootstrap_nodes", POINTER(c_char_p)),   # const char* const* ("host:port"; NULL-terminated; NULL → defaults)
+        ("stun_servers", POINTER(c_char_p)),      # const char* const* ("host:port"; NULL-terminated; NULL → defaults)
     ]
 
 
@@ -194,7 +196,7 @@ class LibratsCtypes:
         lib.rats_on.restype = c_int
 
         # --- discovery / port mapping subsystems ---
-        lib.rats_enable_dht.argtypes = [c_void_p, c_uint16, c_char_p]
+        lib.rats_enable_dht.argtypes = [c_void_p, c_uint16, c_char_p, POINTER(c_char_p), POINTER(c_char_p)]
         lib.rats_enable_dht.restype = c_int
 
         lib.rats_enable_mdns.argtypes = [c_void_p]
