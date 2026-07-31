@@ -5,7 +5,7 @@
 // key, dialing whatever it finds — so two nodes sharing a key find each other
 // with no known addresses, across the open internet.
 //
-//   05_dht_discovery <listen_port> [discovery_key] [data_dir] [--bootstrap host:port ...]
+//   05_dht_discovery <listen_port> [discovery_key] [data_dir] [--bootstrap host:port ...] [--stun host:port ...]
 //
 //   ./05_dht_discovery 9000 my-app-demo
 //   ./05_dht_discovery 9001 my-app-demo     # on another machine, same key
@@ -26,7 +26,8 @@ using namespace librats;
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cerr << "usage: " << argv[0] << " <listen_port> [discovery_key] [data_dir]\n";
+        std::cerr << "usage: " << argv[0] << " <listen_port> [discovery_key] [data_dir]\n"
+                     "         [--bootstrap host:port]... [--stun host:port]...\n";
         return 1;
     }
 
@@ -35,13 +36,20 @@ int main(int argc, char** argv) {
     config.bind_address = "::";
     if (argc >= 4) config.data_dir = argv[3];
     // Optional DHT bootstrap routers: --bootstrap router.example.com:6881 (repeatable).
-    // When none are given, the built-in public BitTorrent routers are used.
+    // Optional STUN servers: --stun stun.l.google.com:19302 (repeatable).
+    // When none are given, the built-in public defaults are used.
     for (int i = 4; i < argc; ++i) {
         if (std::string(argv[i]) == "--bootstrap" && i + 1 < argc) {
             if (auto hp = HostEndpoint::parse(argv[++i]))
                 config.bootstrap_nodes.push_back(*hp);
             else
                 std::cerr << "ignoring bad --bootstrap target: " << argv[i] << "\n";
+        }
+        else if (std::string(argv[i]) == "--stun" && i + 1 < argc) {
+            if (auto hp = HostEndpoint::parse(argv[++i]))
+                config.stun_servers.push_back(*hp);
+            else
+                std::cerr << "ignoring bad --stun target: " << argv[i] << "\n";
         }
     }
 

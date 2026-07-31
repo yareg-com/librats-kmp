@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "usage: " << argv[0] << " <listen_port> [--bind addr] [--data dir]"
                      " [--connect host port] [--no-dht] [--no-mdns] [--no-upnp] [--no-pex]"
-                     " [--no-reconnect] [--no-ping] [--bootstrap host:port]"
+                     " [--no-reconnect] [--no-ping] [--bootstrap host:port] [--stun host:port]"
 #ifdef RATS_SEARCH_FEATURES
                      " [--no-bittorrent] [--bt-port port]"
 #endif
@@ -200,6 +200,13 @@ int main(int argc, char** argv) {
                 config.bootstrap_nodes.push_back(*hp);
             else
                 std::cerr << "--bootstrap: '" << argv[i + 1] << "' is not host:port\n";
+            ++i;
+        }
+        else if (arg == "--stun" && i + 1 < argc) {
+            if (auto hp = HostEndpoint::parse(argv[i + 1]))
+                config.stun_servers.push_back(*hp);
+            else
+                std::cerr << "--stun: '" << argv[i + 1] << "' is not host:port\n";
             ++i;
         }
         else if (arg == "--no-dht")       use_dht = false;
