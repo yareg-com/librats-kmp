@@ -28,15 +28,18 @@ class RatsNode(
 
     fun create(
         config: Config
-    ): Long = RatsClient.nativeCreateConfig(
-        listenPort = config.port,
-        enableListen = config.listen,
-        bindAddress = config.bindAddress,
-        security = config.security.id,
-        dataDir = config.dataDirectory,
-        protocol = config.protocol,
-        maxPeers = config.maxPeers
-    )
+    ): Long = config.run {
+        RatsClient.nativeCreateConfig(
+            listenPort = port,
+            enableListen = listen,
+            bindAddress = bindAddress,
+            security = security.id,
+            dataDir = dataDirectory,
+            protocol = protocol,
+            maxPeers = maxPeers,
+            bootstrapNodes = bootstrapNodes
+        )
+    }
 
     /**
      * Starts the node: binds the listener and brings up enabled subsystems

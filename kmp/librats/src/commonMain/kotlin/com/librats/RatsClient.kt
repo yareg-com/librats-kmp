@@ -28,7 +28,8 @@ object RatsClient {
         security: Int,
         dataDir: String?,
         protocol: String?,
-        maxPeers: Long
+        maxPeers: Long,
+        bootstrapNodes: List<String>?
     ): Long
 
     external fun nativeCreate(listenPort: Int): Long
