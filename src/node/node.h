@@ -109,6 +109,10 @@ public:
     /// Application protocol identity bound into the handshake (see NodeConfig).
     const std::string& protocol() const noexcept override { return config_.protocol; }
 
+    /// The full construction config (listen port, bind address, DHT bootstrap
+    /// nodes, …). Read-only; the node was already built from it.
+    const NodeConfig& config() const noexcept { return config_; }
+
     // — node-scoped coordination, shared by subsystems and the app (see NodeContext) —
     //   events()   : fire-and-forget notifications, one→many (host events, …)
     //   services() : targeted synchronous calls by capability interface, one→one

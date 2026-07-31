@@ -18,7 +18,7 @@ import threading
 import weakref
 from typing import Any, Dict, List, Optional
 
-from ctypes import byref, c_size_t, c_int, string_at
+from ctypes import byref, c_size_t, c_int, c_char_p, string_at
 
 from .ctypes_wrapper import get_librats, take_string, RatsConfig
 from .enums import RatsError as ErrorCode, Security, LogLevel, VersionInfo
@@ -49,6 +49,7 @@ class RatsClient:
         data_dir: Optional[str] = None,
         protocol: Optional[str] = None,
         max_peers: int = 0,
+        bootstrap_nodes: Optional[List[str]] = None,
     ):
         """Create a node.
 
@@ -61,6 +62,9 @@ class RatsClient:
             protocol: Handshake app id, e.g. ``"myapp/1.0"``; ``None`` →
                 ``"librats/1.0"``. Peers whose protocol differs cannot connect.
             max_peers: Established-peer cap (0 = unlimited).
+            bootstrap_nodes: DHT bootstrap routers as ``"host:port"`` strings
+                (e.g. ``"router.bittorrent.com:6881"``); empty/``None`` → the
+                built-in public BitTorrent DHT routers.
         """
         self._lib = get_librats()
 
@@ -79,6 +83,13 @@ class RatsClient:
             cfg.data_dir = self._cfg_keepalive[1]
         if protocol is not None:
             cfg.protocol = self._cfg_keepalive[2]
+        if bootstrap_nodes:
+            encoded = [_b(n) for n in bootstrap_nodes]
+            self._cfg_keepalive.extend(encoded)          # keep the bytes alive
+            node_array = (c_char_p * len(encoded))(*encoded)
+            self._cfg_keepalive.append(node_array)       # keep the array alive
+            cfg.bootstrap_nodes = node_array
+            cfg.bootstrap_nodes_count = len(encoded)
 
         self._handle = self._lib.lib.rats_create_config(byref(cfg))
         if not self._handle:
