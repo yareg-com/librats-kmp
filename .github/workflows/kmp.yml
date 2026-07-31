@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - kmp
+      - kmp-bootstrap-nodes
 #    branches: [kmp, master]
 #  pull_request:
 #    branches: [main, master]
