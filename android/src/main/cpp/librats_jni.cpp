@@ -51,7 +51,7 @@ static JNIEnv* getEnv() {
     jint rc = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
     if (rc == JNI_OK) return env;
     if (rc == JNI_EDETACHED) {
-        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        if (g_jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
             LOGE("AttachCurrentThread failed");
             return nullptr;
         }
