@@ -441,15 +441,6 @@ if(ANDROID)
         message(FATAL_ERROR "ANDROID_PLATFORM is not defined!")
     endif()
 
-    if(ANDROID_API_LEVEL LESS 24)
-        target_sources(rats PRIVATE ${PROJECT_SOURCE_DIR}/3rdparty/android/ifaddrs-android.c)
-        target_include_directories(rats
-            PRIVATE
-            ${PROJECT_SOURCE_DIR}/3rdparty/android
-        )
-        target_compile_definitions(rats PUBLIC RATS_ANDROID_OLD_API)
-        message(STATUS "Using ifaddrs-android for backward compatibility")
-    endif()
 endif()
 
 if(RATS_SEARCH_FEATURES)

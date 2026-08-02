@@ -15,7 +15,7 @@
 #ifdef _WIN32
     #include <iphlpapi.h>
     #include <netioapi.h>
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__)
     #include <sys/socket.h>
     #include <linux/netlink.h>
     #include <linux/rtnetlink.h>
@@ -212,7 +212,7 @@ void NetworkMonitor::backend_stop() {
 // ============================================================================
 // Linux backend: NETLINK_ROUTE socket
 // ============================================================================
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__)
 
 bool NetworkMonitor::backend_start() {
     int fd = ::socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);

@@ -11,11 +11,7 @@
     #include <arpa/inet.h>
     #include <netinet/in.h>
 
-    #ifdef RATS_ANDROID_OLD_API
-        #include <ifaddrs-android.h>
-    #else
-        #include <ifaddrs.h>
-    #endif
+    #include <ifaddrs.h>
 
     // macOS / BSD default-gateway lookup via the PF_ROUTE sysctl routing table.
     #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || \

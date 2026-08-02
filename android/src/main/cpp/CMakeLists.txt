@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Android system libraries: liblog for __android_log_print. Socket/networking
 # symbols are part of Bionic libc (no separate lib to link). The core 'rats'
 # target links any Android-specific helpers itself (see the root CMakeLists.txt
-# ANDROID branch — ifaddrs shim for API < 24).
+# ANDROID branch).
 find_library(log-lib log)
 find_package(Threads REQUIRED)
 
