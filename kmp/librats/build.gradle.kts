@@ -71,7 +71,7 @@ val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
 //        "-DRATS_SHARED_LIBRARY=ON",
 //        "-DRATS_STATIC_LIBRARY=OFF",
 //        "-DCMAKE_BUILD_TYPE=Release",
-        "-DJAVA_HOME=/home/yareg/.jdks/temurin-21.0.10/",
+//        "-DJAVA_HOME=",
         "-B", buildDir.absolutePath,
         "-S", sourceDir.absolutePath
     )
