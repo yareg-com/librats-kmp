@@ -20,7 +20,7 @@ kotlin {
 
     android {
         namespace = "com.librats"
-        minSdk = 21
+        minSdk = 24
         compileSdk = libs.versions.android.sdk.compile.get().toInt()
         buildToolsVersion = libs.versions.android.build.tools.get()
     }
@@ -71,7 +71,7 @@ val cmakeGenerate = tasks.register<Exec>("cmakeGenerate") {
 //        "-DRATS_SHARED_LIBRARY=ON",
 //        "-DRATS_STATIC_LIBRARY=OFF",
 //        "-DCMAKE_BUILD_TYPE=Release",
-//        "-DJAVA_HOME=",
+        "-DJAVA_HOME=/home/yareg/.jdks/temurin-21.0.10/",
         "-B", buildDir.absolutePath,
         "-S", sourceDir.absolutePath
     )

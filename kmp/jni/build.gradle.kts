@@ -9,7 +9,7 @@ android {
     buildToolsVersion = libs.versions.android.build.tools.get()
 
     defaultConfig {
-        minSdk = 21
+        minSdk = 24
 
         ndk {
             abiFilters.addAll(setOf(
