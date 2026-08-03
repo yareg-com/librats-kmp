@@ -11,4 +11,7 @@ object RatsBuild {
     val gitCommitHash: String
         get() = RatsClient.nativeGitDescribe()
 
+    val abi: Int
+        get() = RatsClient.nativeAbi()
+
 }

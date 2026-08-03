@@ -23,11 +23,15 @@ class Topics(
 
     fun subscribe(
         topic: String,
-        callback: TopicMessageCallback
+        block: (peerId: String, topic: String, data: ByteArray) -> Unit
     ): Int = RatsClient.nativeSubscribe(
         ptr = ptr(),
         topic = topic,
-        callback = callback
+        callback = object : TopicMessageCallback {
+            override fun onTopicMessage(peerId: String, topic: String, data: ByteArray) {
+                block(peerId, topic, data)
+            }
+        }
     )
 
     //------------------------------------------------------------------------------------------------------------------

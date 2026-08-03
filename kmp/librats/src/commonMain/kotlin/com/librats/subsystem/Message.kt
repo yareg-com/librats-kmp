@@ -48,11 +48,15 @@ class Message(
 
     fun onReceived(
         channel: String,
-        block: MessageCallback
+        block: (peerId: String, data: ByteArray) -> Unit
     ): Int = RatsClient.nativeOn(
         ptr = ptr(),
         channel = channel,
-        callback = block
+        callback = object : MessageCallback {
+            override fun onMessage(peerId: String, data: ByteArray) {
+                block(peerId, data)
+            }
+        }
     )
 
 }

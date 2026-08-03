@@ -163,30 +163,4 @@ object RatsClient {
     external fun nativeGitDescribe(): String
     external fun nativeAbi(): Int
 
-    //------------------------------------------------------------------------------------------------------------------
-    //
-    // CONSTANTS
-    //
-    //------------------------------------------------------------------------------------------------------------------
-
-    // rats_error_t values (must match src/bindings/rats.h).
-    const val OK: Int = 0
-    const val ERR_INVALID_ARG: Int = 1
-    const val ERR_NOT_STARTED: Int = 2
-    const val ERR_ALREADY_STARTED: Int = 3
-    const val ERR_NOT_ENABLED: Int = 4
-    const val ERR_NO_SUCH_PEER: Int = 5
-    const val ERR_BIND: Int = 6
-    const val ERR_INTERNAL: Int = 7
-
-    // rats_security_t values.
-    const val SECURITY_NOISE: Int = 0
-    const val SECURITY_PLAINTEXT: Int = 1
-
-    // rats_log_level_t values.
-    const val LOG_DEBUG: Int = 0
-    const val LOG_INFO: Int = 1
-    const val LOG_WARN: Int = 2
-    const val LOG_ERROR: Int = 3
-
 }

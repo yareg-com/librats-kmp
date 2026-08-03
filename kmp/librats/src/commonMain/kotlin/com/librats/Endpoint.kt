@@ -7,11 +7,12 @@ import com.librats.subsystem.Peers
 import com.librats.subsystem.Topics
 import kotlin.Int
 
-class RatsNode(
-    config: Config,
-    setup: RatsNode.() -> Unit = { }
+class Endpoint(
+    options: EndpointOptions,
+    setup: Endpoint.() -> Unit = { }
 ) : AutoCloseable {
-    private val ptr: Long = create(config).apply {
+
+    private val ptr: Long = create(options).apply {
         if (this == 0L) throw RatsException("Failed to create native rats node")
     }
 
@@ -25,10 +26,9 @@ class RatsNode(
     //
     //------------------------------------------------------------------------------------------------------------------
 
-
     fun create(
-        config: Config
-    ): Long = config.run {
+        options: EndpointOptions
+    ): Long = options.run {
         RatsClient.nativeCreateConfig(
             listenPort = port,
             enableListen = listen,
@@ -58,6 +58,7 @@ class RatsNode(
     /**
      * Destroys the node and releases all native resources
      */
+
     fun destroy(): Unit = RatsClient.nativeDestroy(ptr)
 
     override fun close() = destroy()

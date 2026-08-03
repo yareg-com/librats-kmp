@@ -23,6 +23,13 @@ kotlin {
         minSdk = 24
         compileSdk = libs.versions.android.sdk.compile.get().toInt()
         buildToolsVersion = libs.versions.android.build.tools.get()
+
+        optimization {
+            consumerKeepRules.apply {
+                publish = true
+                files("consumer-rules.pro")
+            }
+        }
     }
 
     sourceSets {

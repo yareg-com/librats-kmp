@@ -53,10 +53,14 @@ class Peers(
     */
 
     fun onConnected(
-        block: ConnectionCallback
+        block: (peerId: String) -> Unit
     ) = RatsClient.nativeOnPeerConnected(
         ptr = ptr(),
-        callback = block
+        callback = object : ConnectionCallback {
+            override fun onConnected(peerId: String) {
+                block(peerId)
+            }
+        }
     )
 
     //------------------------------------------------------------------------------------------------------------------
@@ -66,10 +70,14 @@ class Peers(
     */
 
     fun onDisconnected(
-        block: DisconnectCallback
+        block: (peerId: String) -> Unit
     ) = RatsClient.nativeOnPeerDisconnected(
         ptr = ptr(),
-        callback = block
+        callback = object : DisconnectCallback {
+            override fun onDisconnected(peerId: String) {
+                block(peerId)
+            }
+        }
     )
 
 }
