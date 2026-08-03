@@ -14,7 +14,7 @@ class RatsException : RuntimeException {
     val errorCode: Int
 
     constructor(message: String?) : super(message) {
-        this.errorCode = RatsClient.ERR_INTERNAL
+        this.errorCode = Error.Internal.id
     }
 
     constructor(errorCode: Int) : super(getErrorMessage(errorCode)) {
@@ -26,21 +26,21 @@ class RatsException : RuntimeException {
     }
 
     constructor(message: String?, cause: Throwable?) : super(message, cause) {
-        this.errorCode = RatsClient.ERR_INTERNAL
+        this.errorCode = Error.Internal.id
     }
 
     companion object {
         /** Human-readable name for a `rats_error_t` value.  */
         fun getErrorMessage(errorCode: Int): String {
             return when (errorCode) {
-                RatsClient.OK                  -> "OK"
-                RatsClient.ERR_INVALID_ARG     -> "Invalid argument"
-                RatsClient.ERR_NOT_STARTED     -> "Node not started"
-                RatsClient.ERR_ALREADY_STARTED -> "Node already started"
-                RatsClient.ERR_NOT_ENABLED     -> "Subsystem not enabled"
-                RatsClient.ERR_NO_SUCH_PEER    -> "No such peer or transfer"
-                RatsClient.ERR_BIND            -> "Listen/bind failed"
-                RatsClient.ERR_INTERNAL        -> "Internal error"
+                Error.OK.id                  -> "OK"
+                Error.InvalidArguments.id     -> "Invalid argument"
+                Error.NotStarted.id -> "Node not started"
+                Error.AlreadyStarted.id -> "Node already started"
+                Error.NotEnabled.id -> "Subsystem not enabled"
+                Error.NoSuchPeer.id -> "No such peer or transfer"
+                Error.Bind.id -> "Listen/bind failed"
+                Error.Internal.id -> "Internal error"
                 else                           -> "Unknown error ($errorCode)"
             }
         }
