@@ -267,6 +267,11 @@ public class RatsClient {
         return nativeEnablePortMapping(nativePtr, enableUpnp, enableNatpmp);
     }
 
+    /** Enables the PeerExchange (PEX) subsystem. Call before start. */
+    public int enablePex() {
+        return nativeEnablePex(nativePtr);
+    }
+
     // ===================== pub/sub (topics, raw bytes) =====================
 
     /** Enables the pub/sub (GossipSub) subsystem. Call before start. */
@@ -495,6 +500,7 @@ public class RatsClient {
                                        String[] bootstrapNodes, String[] stunServers);
     private native int nativeEnableMdns(long ptr);
     private native int nativeEnablePortMapping(long ptr, boolean enableUpnp, boolean enableNatpmp);
+    private native int nativeEnablePex(long ptr);
 
     private native int nativeEnablePubsub(long ptr);
     private native int nativeSubscribe(long ptr, String topic, TopicMessageCallback callback);

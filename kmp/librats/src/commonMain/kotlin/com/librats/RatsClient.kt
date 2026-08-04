@@ -76,6 +76,7 @@ object RatsClient {
     ): Int
     external fun nativeEnableMdns(ptr: Long): Int
     external fun nativeEnablePortMapping(ptr: Long, enableUpnp: Boolean, enableNatpmp: Boolean): Int
+    external fun nativeEnablePex(ptr: Long): Int
 
     //------------------------------------------------------------------------------------------------------------------
     //

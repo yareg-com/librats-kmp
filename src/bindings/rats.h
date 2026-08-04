@@ -166,6 +166,12 @@ RATS_API rats_error_t rats_enable_mdns(rats_t node);
  *  Pass non-zero to enable each backend; both run in parallel. */
 RATS_API rats_error_t rats_enable_port_mapping(rats_t node, int enable_upnp, int enable_natpmp);
 
+/** Enable the PeerExchange (PEX) subsystem: pull-only peer gossip.
+ *  On each new connection the node asks the peer for a sample of its known
+ *  addresses and dials the new ones. Rate-limited to avoid dial storms.
+ *  Call before start(). */
+RATS_API rats_error_t rats_enable_pex(rats_t node);
+
 /* — peer enumeration — */
 
 /** Hex ids of currently-connected peers. Writes the count to *count and returns a

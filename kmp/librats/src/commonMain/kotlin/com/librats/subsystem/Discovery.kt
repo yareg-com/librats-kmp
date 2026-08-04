@@ -51,4 +51,13 @@ class Discovery(
         enableNatpmp = natPmp
     )
 
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
+        Enables the PeerExchange (PEX) subsystem. Call before node start.
+        @return {@link #OK} on success, otherwise a {@code rats_error_t} code
+    */
+
+    fun enablePex(): Int = RatsClient.nativeEnablePex(ptr())
+
 }
