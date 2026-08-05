@@ -457,6 +457,11 @@ Java_com_librats_RatsClient_nativeEnablePortMapping(JNIEnv*, jobject, jlong ptr,
     return rats_enable_port_mapping(node_of(ptr), upnp ? 1 : 0, natpmp ? 1 : 0);
 }
 
+JNIEXPORT jint JNICALL
+Java_com_librats_RatsClient_nativeEnablePex(JNIEnv*, jobject, jlong ptr) {
+    return rats_enable_pex(node_of(ptr));
+}
+
 // ---- pub/sub ----
 
 JNIEXPORT jint JNICALL

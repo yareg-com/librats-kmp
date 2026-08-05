@@ -273,6 +273,24 @@ TEST(NodeCApiTest, ReconnectDialsTarget) {
     rats_destroy(client); rats_destroy(server);
 }
 
+// PeerExchange subsystem: enable, idempotency, and after-start guard.
+TEST(NodeCApiTest, PeerExchangeEnable) {
+    rats_t node = rats_create(0);
+    ASSERT_NE(node, nullptr);
+
+    // First enable succeeds.
+    EXPECT_EQ(rats_enable_pex(node), RATS_OK);
+    // Double-enable is idempotent.
+    EXPECT_EQ(rats_enable_pex(node), RATS_OK);
+
+    ASSERT_EQ(rats_start(node), RATS_OK);
+    // Enable after start must fail.
+    EXPECT_EQ(rats_enable_pex(node), RATS_ERR_ALREADY_STARTED);
+
+    rats_stop(node);
+    rats_destroy(node);
+}
+
 // rats_once_json fires exactly once, then auto-removes.
 TEST(NodeCApiTest, OnceJsonFiresOnce) {
     rats_t server = rats_create(0);

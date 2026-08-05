@@ -10,6 +10,7 @@
 #include "subsystems/file_transfer.h"
 #include "subsystems/ping_service.h"
 #include "subsystems/reconnection.h"
+#include "subsystems/peer_exchange.h"
 #ifdef RATS_SEARCH_FEATURES
 #include "subsystems/bittorrent.h"
 #endif
@@ -47,6 +48,7 @@ struct RatsHandle {
     bool dht_enabled     = false;
     bool mdns_enabled    = false;
     bool portmap_enabled = false;
+    bool pex_enabled     = false;
     bool started         = false;
 };
 
@@ -296,6 +298,16 @@ rats_error_t rats_enable_port_mapping(rats_t node, int enable_upnp, int enable_n
     config.enable_natpmp = enable_natpmp != 0;
     h->node->add_subsystem(std::make_unique<PortMappingService>(config));
     h->portmap_enabled = true;
+    return RATS_OK;
+}
+
+rats_error_t rats_enable_pex(rats_t node) {
+    auto* h = as_handle(node);
+    if (h->started) return RATS_ERR_ALREADY_STARTED;
+    if (!h->pex_enabled) {
+        h->node->add_subsystem(std::make_unique<PeerExchange>());
+        h->pex_enabled = true;
+    }
     return RATS_OK;
 }
 
