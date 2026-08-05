@@ -3,7 +3,7 @@ name: KMP library publishing
 on:
   push:
     branches:
-      - kmp
+      - main
 #    branches: [kmp, master]
 #  pull_request:
 #    branches: [main, master]
