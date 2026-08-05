@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - kmp
-      - kmp-jni-pex
 #    branches: [kmp, master]
 #  pull_request:
 #    branches: [main, master]
