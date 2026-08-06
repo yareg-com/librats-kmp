@@ -1,4 +1,4 @@
-name: KMP library publishing
+name: Publish
 
 on:
   push:
