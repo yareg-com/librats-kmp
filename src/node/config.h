@@ -5,6 +5,7 @@
  * @brief Node construction options.
  */
 
+#include "util/rats_export.h"
 #include "core/host_endpoint.h"
 
 #include <cstdint>
@@ -13,7 +14,7 @@
 
 namespace librats {
 
-struct NodeConfig {
+struct RATS_API NodeConfig {
     /// Listen port for inbound peers. 0 picks an ephemeral port. Ignored if
     /// enable_listen is false (client-only node).
     uint16_t listen_port = 0;

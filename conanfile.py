@@ -8,14 +8,14 @@ import os
 class LibratsConan(ConanFile):
     name = "librats"
     license = "MIT"
-    url = "https://github.com/DEgITx/librats"
-    homepage = "https://github.com/DEgITx/librats"
+    url = "https://github.com/librats/librats"
+    homepage = "https://github.com/librats/librats"
     description = (
         "C++17 peer-to-peer networking library: encrypted P2P (Noise XX), "
-        "DHT/mDNS discovery, NAT traversal (STUN/TURN/ICE), GossipSub "
+        "DHT/mDNS discovery, NAT traversal (STUN/UPnP/NAT-PMP), GossipSub "
         "pub/sub, file transfer, optional BitTorrent."
     )
-    topics = ("p2p", "networking", "dht", "noise-protocol", "ice",
+    topics = ("p2p", "networking", "dht", "noise-protocol",
               "gossipsub", "bittorrent", "nat-traversal")
 
     settings = "os", "arch", "compiler", "build_type"
@@ -106,6 +106,14 @@ class LibratsConan(ConanFile):
             self.cpp_info.defines.append("RATS_SEARCH_FEATURES")
         if self.options.storage:
             self.cpp_info.defines.append("RATS_STORAGE")
+
+        # Consumers of the Windows DLL need __declspec(dllimport) on the public
+        # classes (see src/util/rats_export.h). CMakeDeps generates its own config
+        # from this method and never reads the project's ratsConfig.cmake, so the
+        # INTERFACE define set in CMakeLists.txt does not reach Conan consumers —
+        # it has to be repeated here. Keep both sides in sync.
+        if self.options.shared and self.settings.os == "Windows":
+            self.cpp_info.defines.append("RATS_IMPORT_DLL")
 
         if self.settings.os in ("Linux", "FreeBSD"):
             self.cpp_info.system_libs = ["pthread"]
