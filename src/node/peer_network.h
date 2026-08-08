@@ -50,6 +50,11 @@ public:
     // all run on a reactor thread. Register before start().
     virtual void                on_peer_connected(PeerEventHandler handler) = 0;
     virtual void                on_peer_disconnected(PeerDisconnectHandler handler) = 0;
+    // Fires when a peer's identify message is processed and its dialable addresses
+    // are populated. Carries the peer and the newly learned addresses.  Useful for
+    // PEX push: the central node can immediately announce the new peer to others.
+    using PeerIdentifiedHandler = std::function<void(const Peer&, const std::vector<Address>&)>;
+    virtual void                on_peer_identified(PeerIdentifiedHandler handler) = 0;
     // An outbound dial WE initiated closed before it ever established (TCP connect
     // refused/timed out, or the handshake failed). Carries the address we dialed.
     // There is no on_peer_disconnected for a connection that never came up, so this

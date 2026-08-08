@@ -459,8 +459,32 @@ Java_com_librats_RatsClient_nativeEnablePortMapping(JNIEnv*, jobject, jlong ptr,
 }
 
 JNIEXPORT jint JNICALL
-Java_com_librats_RatsClient_nativeEnablePex(JNIEnv*, jobject, jlong ptr) {
-    return rats_enable_pex(node_of(ptr));
+Java_com_librats_RatsClient_nativeEnablePex(JNIEnv*, jobject, jlong ptr, jboolean publicOnly) {
+    return rats_enable_pex(node_of(ptr), publicOnly ? 1 : 0);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_librats_RatsClient_nativeEnableStun(JNIEnv* env, jobject, jlong ptr, jobjectArray servers) {
+    if (!servers) return rats_enable_stun(node_of(ptr), nullptr);
+    const jsize count = env->GetArrayLength(servers);
+    std::vector<std::string> strs;
+    std::vector<const char*> ptrs;
+    strs.reserve(static_cast<size_t>(count));
+    for (jsize i = 0; i < count; ++i) {
+        jstring js = static_cast<jstring>(env->GetObjectArrayElement(servers, i));
+        if (!js) continue;
+        strs.push_back(toCString(env, js));
+        env->DeleteLocalRef(js);
+    }
+    ptrs.reserve(strs.size() + 1);
+    for (const std::string& s : strs) ptrs.push_back(s.c_str());
+    ptrs.push_back(nullptr);
+    return rats_enable_stun(node_of(ptr), ptrs.data());
+}
+
+JNIEXPORT jint JNICALL
+Java_com_librats_RatsClient_nativeRequestPeers(JNIEnv*, jobject, jlong ptr) {
+    return rats_request_peers(node_of(ptr));
 }
 
 // ---- pub/sub ----

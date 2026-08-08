@@ -41,6 +41,7 @@ struct RatsHandle {
     FileTransfer*        files     = nullptr;
     PingService*         ping      = nullptr;
     ReconnectionService* reconnect = nullptr;
+    PeerExchange*        pex       = nullptr;
 #ifdef RATS_SEARCH_FEATURES
     Bittorrent*          bittorrent = nullptr;
 #endif
@@ -48,7 +49,7 @@ struct RatsHandle {
     bool dht_enabled     = false;
     bool mdns_enabled    = false;
     bool portmap_enabled = false;
-    bool pex_enabled     = false;
+    bool stun_enabled    = false;
     bool started         = false;
 };
 
@@ -301,13 +302,38 @@ rats_error_t rats_enable_port_mapping(rats_t node, int enable_upnp, int enable_n
     return RATS_OK;
 }
 
-rats_error_t rats_enable_pex(rats_t node) {
+rats_error_t rats_enable_pex(rats_t node, int public_only) {
     auto* h = as_handle(node);
     if (h->started) return RATS_ERR_ALREADY_STARTED;
-    if (!h->pex_enabled) {
-        h->node->add_subsystem(std::make_unique<PeerExchange>());
-        h->pex_enabled = true;
+    if (!h->pex) {
+        PeerExchange::Config cfg;
+        cfg.public_only = public_only != 0;
+        h->pex = h->node->add_subsystem(std::make_unique<PeerExchange>(std::move(cfg)));
     }
+    return RATS_OK;
+}
+
+rats_error_t rats_enable_stun(rats_t node, const char* const* servers) {
+    auto* h = as_handle(node);
+    if (h->started) return RATS_ERR_ALREADY_STARTED;
+    if (!h->stun_enabled) {
+        std::vector<HostEndpoint> stun_servers;
+        if (servers) {
+            for (const char* const* s = servers; *s; ++s) {
+                auto ep = HostEndpoint::parse(*s);
+                if (ep) stun_servers.push_back(*ep);
+            }
+        }
+        h->node->enable_stun(std::move(stun_servers));
+        h->stun_enabled = true;
+    }
+    return RATS_OK;
+}
+
+rats_error_t rats_request_peers(rats_t node) {
+    auto* h = as_handle(node);
+    if (!h->pex) return RATS_ERR_NOT_ENABLED;
+    h->pex->request_peers();
     return RATS_OK;
 }
 

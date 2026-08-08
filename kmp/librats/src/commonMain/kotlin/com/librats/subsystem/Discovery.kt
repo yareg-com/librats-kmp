@@ -55,9 +55,41 @@ class Discovery(
 
     /**
         Enables the PeerExchange (PEX) subsystem. Call before node start.
+        @param publicOnly if true, only share globally-routable (non-LAN) addresses
         @return {@link #OK} on success, otherwise a {@code rats_error_t} code
     */
 
-    fun enablePex(): Int = RatsClient.nativeEnablePex(ptr())
+    fun enablePex(
+        publicOnly: Boolean = false
+    ): Int = RatsClient.nativeEnablePex(
+        ptr = ptr(),
+        publicOnly = publicOnly
+    )
+
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
+        Enable STUN probing: on start the node probes STUN servers to discover its
+        public address, which is then shared via identify and PEX.
+        @param servers STUN servers as "host:port" strings, or null for built-in defaults.
+        @return {@link #OK} on success, otherwise a {@code rats_error_t} code
+    */
+
+    fun enableStun(
+        servers: List<String>? = null
+    ): Int = RatsClient.nativeEnableStun(
+        ptr = ptr(),
+        servers = servers?.toTypedArray()
+    )
+
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
+        Explicitly ask every connected peer for its known peer list.
+        Useful when the automatic on-connect request missed peers.
+        @return {@link #OK} on success, otherwise a {@code rats_error_t} code
+    */
+
+    fun requestPeers(): Int = RatsClient.nativeRequestPeers(ptr())
 
 }
