@@ -138,7 +138,7 @@ bool Node::start() {
                 if (r.success && r.mapped_address) {
                     const auto& ma = *r.mapped_address;
                     auto ip = IpAddress::parse(ma.address);
-                    if (ip && !ip->is_any() && !ip->is_loopback()) {
+                    if (ip && !ip->is_any()) {
                         add_public_address(Address{*ip, ma.port});
                         return;
                     }

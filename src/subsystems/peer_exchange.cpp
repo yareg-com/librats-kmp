@@ -44,6 +44,17 @@ void PeerExchange::attach(NodeContext& ctx) {
 void PeerExchange::start() { running_.store(true); }
 void PeerExchange::stop()  { running_.store(false); }
 
+// ── Explicit pull ──────────────────────────────────────────────────────────
+
+void PeerExchange::request_peers() {
+    if (!running_.load() || !network_) return;
+    const uint16_t max = static_cast<uint16_t>(std::min<size_t>(config_.request_max, 0xFFFF));
+    uint8_t req[kRequestSize] = {kVersion, kRequest,
+                                 static_cast<uint8_t>(max >> 8), static_cast<uint8_t>(max & 0xFF)};
+    for (const PeerId& id : network_->connected_peers())
+        network_->send(id, MessageType::Pex, ByteView(req, kRequestSize));
+}
+
 // ── Outgoing request (on connect) ────────────────────────────────────────────
 
 void PeerExchange::on_connected(const Peer& peer) {

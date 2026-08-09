@@ -69,6 +69,11 @@ public:
     void start() override;
     void stop() override;
 
+    /// Explicitly ask every connected peer for its known peer list.
+    /// Safe to call at any time after start(); useful when the automatic
+    /// on-connect request missed peers due to the identify race.
+    void request_peers();
+
 private:
     void on_connected(const Peer& peer);
     void on_peer_identified(const Peer& peer, const std::vector<Address>& addresses);
