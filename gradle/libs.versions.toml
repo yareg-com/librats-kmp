@@ -1,0 +1,26 @@
+[versions] #------------------------------------------------------------------------------------------------------------
+
+kotlin          = "2.4.10"
+kotlin-compiler = "2.4"
+
+android-gradle-plugin = "9.3.1"
+
+android-sdk-compile = "37"  # Android 17, see https://apilevels.com/
+android-build-tools = "37.0.0"
+
+android-jvm-target = "1.8" # Java 8 (API 24+), can be Java 11 for API 29+, Java 17 for API 33+
+
+kotlinx-coroutines = "1.11.0"
+
+[plugins] #-------------------------------------------------------------------------------------------------------------
+
+kotlin-jvm           = { id = "org.jetbrains.kotlin.jvm",                 version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform",       version.ref = "kotlin" }
+kotlin-android       = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle-plugin" }
+android-library      = { id = "com.android.library",                      version.ref = "android-gradle-plugin" }
+
+[libraries] #-----------------------------------------------------------------------------------------------------------
+
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }

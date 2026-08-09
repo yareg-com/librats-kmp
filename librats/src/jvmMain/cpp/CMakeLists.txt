@@ -22,7 +22,7 @@ find_package(Threads REQUIRED)
 # security, node, subsystems, dht, mdns, crypto, nat) plus the C ABI under
 # src/bindings/rats.{h,cpp} when RATS_BINDINGS is ON, and configures the
 # generated version.h. We do not duplicate the source list here.
-set(LIBRATS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../)
+set(LIBRATS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../)
 set(LIBRATS_BINARY_DIR ${CMAKE_BINARY_DIR}/librats_native)
 
 if(EXISTS "${LIBRATS_SOURCE_DIR}/CMakeLists.txt")
