@@ -140,6 +140,11 @@ public:
     /// peers send their identify message. Useful for NAT awareness / advertising.
     std::vector<Address> observed_addresses() const;
 
+    /// The node's public address as learned from peers (the NAT-mapped IP:port
+    /// that remote peers can reach us at). Returns nullopt if no peer has reported
+    /// our address yet (e.g. no inbound connections, or identify hasn't arrived).
+    std::optional<Address> public_address() const;
+
     /// Add a public address discovered via STUN or other means.
     /// The address is included in the identify exchange and, by extension, in PEX.
     /// May be called from any thread; thread-safe.

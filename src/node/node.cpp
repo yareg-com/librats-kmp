@@ -410,8 +410,10 @@ void Node::send_identify(Connection& conn) {
     msg.listen_port = listen_port_;
     msg.addresses   = advertised_addresses();
     const IpAddress seen_ip = conn.remote_ip();
-    if (!seen_ip.is_any())
-        msg.observed = Address{seen_ip, 0};  // port is the peer's ephemeral; IP is what matters
+    if (auto ep = conn.remote_endpoint()) {
+        if (!ep->ip.is_any() && ep->port != 0)
+            msg.observed = *ep;  // full {ip, port} — the NAT-mapped port for cone NATs
+    }
 
     const Bytes payload = msg.encode();
     conn.send(FrameHeader{MessageType::Control, 0, 0}, ByteView(payload));
@@ -424,13 +426,21 @@ void Node::handle_identify(Connection& conn, const Frame& frame) {
         return;
     }
 
-    // The peer's dialable addresses: the address we see it at paired with its
-    // advertised listen port (the linchpin for inbound peers), plus any extra
-    // addresses it self-advertised. PeerTable de-duplicates and caps the set.
+    // The peer's dialable addresses: the address we see it at paired with the
+    // port from the TCP socket (the NAT-mapped port for inbound peers behind NAT),
+    // the advertised listen port, and any extra addresses self-advertised.
+    // PeerTable de-duplicates and caps the set.
     std::vector<Address> candidates;
     const IpAddress seen_ip = conn.remote_ip();
+    // For inbound connections: the TCP source port is the NAT-mapped port.
+    // For cone NATs this is the correct dialable port; for symmetric NATs it's
+    // only valid for connections to us, but having it doesn't hurt.
+    if (auto ep = conn.remote_endpoint()) {
+        if (ep->port != 0 && !ep->ip.is_any())
+            candidates.push_back(*ep);       // {public_ip, nat_mapped_port}
+    }
     if (msg->listen_port != 0 && !seen_ip.is_any())
-        candidates.push_back(Address{seen_ip, msg->listen_port});
+        candidates.push_back(Address{seen_ip, msg->listen_port});  // {public_ip, local_listen_port}
     for (const Address& a : msg->addresses)
         if (a.port != 0 && !a.ip.is_any())
             candidates.push_back(a);
@@ -446,10 +456,14 @@ void Node::handle_identify(Connection& conn, const Frame& frame) {
         }
     }
 
-    // Learn our own public address: pair the IP the peer saw us at with OUR listen
-    // port (its observed port is our ephemeral source port, not dialable).
-    if (msg->observed && listen_port_ != 0 && !msg->observed->ip.is_any())
-        record_observed_address(Address{msg->observed->ip, listen_port_});
+    // Learn our own public address: the peer tells us what IP:port it sees us at.
+    // If the observed port is non-zero (NAT-mapped port from cone NAT), use it
+    // directly — that's the dialable port. Otherwise fall back to our listen port.
+    if (msg->observed && !msg->observed->ip.is_any()) {
+        uint16_t public_port = msg->observed->port != 0 ? msg->observed->port : listen_port_;
+        if (public_port != 0)
+            record_observed_address(Address{msg->observed->ip, public_port});
+    }
 }
 
 std::vector<Address> Node::advertised_addresses() const {
@@ -493,6 +507,12 @@ void Node::record_observed_address(const Address& addr) {
 std::vector<Address> Node::observed_addresses() const {
     std::lock_guard<std::mutex> lock(observed_mutex_);
     return observed_addresses_;
+}
+
+std::optional<Address> Node::public_address() const {
+    std::lock_guard<std::mutex> lock(observed_mutex_);
+    return observed_addresses_.empty() ? std::nullopt
+                                        : std::make_optional(observed_addresses_.front());
 }
 
 // ── STUN configuration ───────────────────────────────────────────────────

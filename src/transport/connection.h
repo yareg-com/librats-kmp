@@ -131,6 +131,11 @@ public:
     /// dialable address of an *inbound* peer. Empty string on error.
     IpAddress          remote_ip() const;
 
+    /// The peer's full endpoint (IP + port) as seen on the socket. For inbound
+    /// connections behind NAT, the port is the NAT-mapped source port — which is
+    /// the correct dialable port for cone NATs.
+    std::optional<Address> remote_endpoint() const;
+
 private:
     void begin_handshake();             ///< transport up → Handshaking
     size_t read_size() const;           ///< bytes to offer the next recv() (see rx_need_)

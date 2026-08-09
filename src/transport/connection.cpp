@@ -49,6 +49,10 @@ IpAddress Connection::remote_ip() const {
     return ep ? ep->ip : IpAddress{};
 }
 
+std::optional<Address> Connection::remote_endpoint() const {
+    return get_peer_endpoint(socket_);
+}
+
 uint8_t Connection::reactor_index() const noexcept { return reactor_.index(); }
 
 // ── Outbound application frames ─────────────────────────────────────────────

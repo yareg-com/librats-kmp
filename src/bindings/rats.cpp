@@ -355,6 +355,20 @@ void rats_free_peer_ids(char** ids, size_t count) {
     std::free(ids);
 }
 
+rats_error_t rats_get_public_address(rats_t node,
+                                     char* ip_buf, size_t ip_buf_len,
+                                     uint16_t* port) {
+    auto* h = as_handle(node);
+    auto addr = h->node->public_address();
+    if (!addr) return RATS_ERR_NOT_ENABLED;
+    auto ip_str = addr->ip.to_string();
+    if (ip_buf_len == 0) return RATS_ERR_INVALID_ARG;
+    std::strncpy(ip_buf, ip_str.c_str(), ip_buf_len - 1);
+    ip_buf[ip_buf_len - 1] = '\0';
+    if (port) *port = addr->port;
+    return RATS_OK;
+}
+
 /* — pub/sub — */
 
 rats_error_t rats_enable_pubsub(rats_t node) {
