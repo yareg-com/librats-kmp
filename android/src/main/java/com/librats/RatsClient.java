@@ -267,9 +267,27 @@ public class RatsClient {
         return nativeEnablePortMapping(nativePtr, enableUpnp, enableNatpmp);
     }
 
-    /** Enables the PeerExchange (PEX) subsystem. Call before start. */
-    public int enablePex() {
-        return nativeEnablePex(nativePtr);
+    /** Enables the PeerExchange (PEX) subsystem. Call before start.
+     * @param publicOnly if true, only share globally-routable (non-LAN) addresses */
+    public int enablePex(boolean publicOnly) {
+        return nativeEnablePex(nativePtr, publicOnly);
+    }
+
+    /**
+     * Enables STUN probing: on start the node probes STUN servers to discover its
+     * public address, which is then shared via identify and PEX.
+     * @param servers STUN servers as "host:port" strings, or null for built-in defaults.
+     */
+    public int enableStun(String[] servers) {
+        return nativeEnableStun(nativePtr, servers);
+    }
+
+    /**
+     * Explicitly ask every connected peer for its known peer list.
+     * Useful when the automatic on-connect request missed peers.
+     */
+    public int requestPeers() {
+        return nativeRequestPeers(nativePtr);
     }
 
     // ===================== pub/sub (topics, raw bytes) =====================
@@ -500,7 +518,9 @@ public class RatsClient {
                                        String[] bootstrapNodes, String[] stunServers);
     private native int nativeEnableMdns(long ptr);
     private native int nativeEnablePortMapping(long ptr, boolean enableUpnp, boolean enableNatpmp);
-    private native int nativeEnablePex(long ptr);
+    private native int nativeEnablePex(long ptr, boolean publicOnly);
+    private native int nativeEnableStun(long ptr, String[] servers);
+    private native int nativeRequestPeers(long ptr);
 
     private native int nativeEnablePubsub(long ptr);
     private native int nativeSubscribe(long ptr, String topic, TopicMessageCallback callback);

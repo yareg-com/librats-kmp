@@ -8,6 +8,7 @@
 #include "util/logger.h"
 #include "util/network_monitor.h"
 #include "util/network_utils.h"
+#include "nat/stun.h"
 
 #include <algorithm>
 #include <cstring>
@@ -121,6 +122,32 @@ bool Node::start() {
 
     LOG_INFO("node", "Node " << identity_.id.short_hex() << " started on port " << listen_port_
              << " (" << reactors_->size() << " reactor(s), " << subsystems_.size() << " subsystem(s))");
+
+    // Probe STUN asynchronously to discover our public address. The result is fed
+    // into advertised_addresses_ via add_public_address(), making it available for
+    // the identify exchange and PEX. Fire-and-forget: if it fails we just don't
+    // get a public address, which is fine for LAN-only deployments.
+    if (listen_port_ != 0 && stun_enabled_.load(std::memory_order_relaxed)) {
+        auto servers = stun_servers_.empty() ? NodeConfig::default_stun_servers()
+                                                    : stun_servers_;
+        std::thread([this, servers = std::move(servers)] {
+            StunClient stun;
+            for (const HostEndpoint& s : servers) {
+                if (!running_.load()) return;
+                StunResult r = stun.binding_request(s.host, s.port, 3000);
+                if (r.success && r.mapped_address) {
+                    const auto& ma = *r.mapped_address;
+                    auto ip = IpAddress::parse(ma.address);
+                    if (ip && !ip->is_any()) {
+                        add_public_address(Address{*ip, ma.port});
+                        return;
+                    }
+                }
+            }
+            LOG_DEBUG("node", "STUN probing did not yield a usable public address");
+        }).detach();
+    }
+
     return true;
 }
 
@@ -411,9 +438,12 @@ void Node::handle_identify(Connection& conn, const Frame& frame) {
     if (!candidates.empty()) {
         const PeerRoute route{conn.reactor_index(), conn.id()};
         const auto added = peers_.add_addresses(conn.remote_id(), route, candidates);
-        if (!added.empty())
+        if (!added.empty()) {
             LOG_DEBUG("node", "Learned " << added.size() << " address(es) for peer "
                       << conn.remote_id().short_hex() << " (e.g. " << added.front().to_string() << ")");
+            Peer handle = make_peer(conn.remote_id(), route);
+            for (auto& cb : peer_identified_) cb(handle, added);
+        }
     }
 
     // Learn our own public address: pair the IP the peer saw us at with OUR listen
@@ -440,6 +470,14 @@ void Node::rebuild_advertised_addresses(const std::vector<std::string>& local_ip
         }
     }
     std::lock_guard<std::mutex> lock(advertised_mutex_);
+    // Append public address if present and not already covered.
+    if (public_address_ && listen_port_ != 0) {
+        bool dup = false;
+        for (const Address& a : fresh)
+            if (a.ip == public_address_->ip) { dup = true; break; }
+        if (!dup && fresh.size() < IdentifyMessage::kMaxAddresses)
+            fresh.push_back(*public_address_);
+    }
     advertised_addresses_ = std::move(fresh);
 }
 
@@ -455,6 +493,26 @@ void Node::record_observed_address(const Address& addr) {
 std::vector<Address> Node::observed_addresses() const {
     std::lock_guard<std::mutex> lock(observed_mutex_);
     return observed_addresses_;
+}
+
+// ── STUN configuration ───────────────────────────────────────────────────
+
+void Node::enable_stun(std::vector<HostEndpoint> servers) {
+    stun_enabled_.store(true, std::memory_order_relaxed);
+    stun_servers_ = std::move(servers);
+}
+
+// ── Public address ─────────────────────────────────────────────────────────
+
+void Node::add_public_address(const Address& addr) {
+    {
+        std::lock_guard<std::mutex> lock(advertised_mutex_);
+        public_address_ = addr;
+    }
+    LOG_INFO("node", "Public address learned: " << addr.to_string()
+             << " — adding to advertised addresses for identify/PEX");
+    // Rebuild so the new address is immediately included in the advertised set.
+    rebuild_advertised_addresses(network_utils::get_local_interface_addresses());
 }
 
 // ── Peer handle methods (defined here for the full Node type) ────────────────

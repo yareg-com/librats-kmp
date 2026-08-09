@@ -36,10 +36,24 @@ void PeerExchange::attach(NodeContext& ctx) {
     network_->on(MessageType::Pex,
                          [this](const Peer& peer, ByteView payload) { handle(peer, payload); });
     network_->on_peer_connected([this](const Peer& peer) { on_connected(peer); });
+    network_->on_peer_identified([this](const Peer& peer, const std::vector<Address>& addrs) {
+        on_peer_identified(peer, addrs);
+    });
 }
 
 void PeerExchange::start() { running_.store(true); }
 void PeerExchange::stop()  { running_.store(false); }
+
+// ── Explicit pull ──────────────────────────────────────────────────────────
+
+void PeerExchange::request_peers() {
+    if (!running_.load() || !network_) return;
+    const uint16_t max = static_cast<uint16_t>(std::min<size_t>(config_.request_max, 0xFFFF));
+    uint8_t req[kRequestSize] = {kVersion, kRequest,
+                                 static_cast<uint8_t>(max >> 8), static_cast<uint8_t>(max & 0xFF)};
+    for (const PeerId& id : network_->connected_peers())
+        network_->send(id, MessageType::Pex, ByteView(req, kRequestSize));
+}
 
 // ── Outgoing request (on connect) ────────────────────────────────────────────
 
@@ -50,6 +64,36 @@ void PeerExchange::on_connected(const Peer& peer) {
     uint8_t req[kRequestSize] = {kVersion, kRequest,
                                  static_cast<uint8_t>(max >> 8), static_cast<uint8_t>(max & 0xFF)};
     network_->send(peer.id(), MessageType::Pex, ByteView(req, kRequestSize));
+}
+
+// ── Push: announce a newly-identified peer to all connected peers ─────────
+
+void PeerExchange::on_peer_identified(const Peer& peer, const std::vector<Address>& addresses) {
+    if (!running_.load() || !network_) return;
+
+    // Pick a shareable address from the newly learned set.
+    const Address* addr = pick_shareable(addresses);
+    if (!addr) return;
+
+    // Build a PEX response containing just this one peer.
+    Bytes out;
+    out.push_back(kVersion);
+    out.push_back(kResponse);
+    out.push_back(0); out.push_back(1);  // count = 1
+
+    const ByteView ip = addr->ip.bytes();
+    out.push_back(static_cast<uint8_t>(ip.size()));
+    out.insert(out.end(), ip.begin(), ip.end());
+    put_u16(out, addr->port);
+    const auto& id_bytes = peer.id().bytes();
+    out.insert(out.end(), id_bytes.begin(), id_bytes.end());
+
+    // Send to every connected peer except the one we just learned about.
+    const PeerId self = network_->local_id();
+    for (const PeerId& id : network_->connected_peers()) {
+        if (id == peer.id() || id == self) continue;
+        network_->send(id, MessageType::Pex, ByteView(out));
+    }
 }
 
 // ── Inbound dispatch ─────────────────────────────────────────────────────────

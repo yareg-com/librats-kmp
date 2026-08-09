@@ -169,8 +169,20 @@ RATS_API rats_error_t rats_enable_port_mapping(rats_t node, int enable_upnp, int
 /** Enable the PeerExchange (PEX) subsystem: pull-only peer gossip.
  *  On each new connection the node asks the peer for a sample of its known
  *  addresses and dials the new ones. Rate-limited to avoid dial storms.
- *  Call before start(). */
-RATS_API rats_error_t rats_enable_pex(rats_t node);
+ *  If public_only is non-zero, only globally-routable (non-LAN) addresses are
+ *  shared.  Call before start(). */
+RATS_API rats_error_t rats_enable_pex(rats_t node, int public_only);
+
+/** Enable STUN probing: on start the node probes STUN servers to discover its
+ *  public (reflexive) address, which is then advertised to peers via identify
+ *  and shared via PEX.  servers is a NULL-terminated array of "host:port"
+ *  strings; NULL or empty → built-in public STUN servers.  Call before start(). */
+RATS_API rats_error_t rats_enable_stun(rats_t node, const char* const* servers);
+
+/** Explicitly ask every connected peer for its known peer list.
+ *  Useful when the automatic on-connect request missed peers due to the
+ *  identify race. Returns RATS_ERR_NOT_ENABLED if PEX is not enabled. */
+RATS_API rats_error_t rats_request_peers(rats_t node);
 
 /* — peer enumeration — */
 

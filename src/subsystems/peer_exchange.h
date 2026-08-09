@@ -5,11 +5,14 @@
  * @brief Peer exchange (PEX): peers gossip the addresses of peers they know, so a
  *        node bootstraps the mesh from its existing links — no DHT/tracker needed.
  *
- * A Subsystem built purely on PeerNetwork. This first cut is deliberately
- * **pull-only**: when we connect to a peer we ask it for some of its known peers,
- * and it replies with a random sample (address + id). We then dial the ones we do
- * not already have. Both sides must run PeerExchange — the responder needs it to
- * answer the request.
+ * A Subsystem built purely on PeerNetwork. It is both pull-only and push-capable:
+ * - **Pull**: when we connect to a peer we ask it for some of its known peers,
+ *   and it replies with a random sample (address + id). We then dial the ones we
+ *   do not already have.
+ * - **Push**: when the central node learns a peer's dialable address (via
+ *   identify), it immediately announces that peer to all other connected peers.
+ *   This eliminates the race condition where PEX fires before identify populates
+ *   the address table.
  *
  * It rides on the node's identify layer: identify is what fills in each peer's
  * dialable address (an inbound peer's listen port is otherwise unknown), and PEX
@@ -66,8 +69,14 @@ public:
     void start() override;
     void stop() override;
 
+    /// Explicitly ask every connected peer for its known peer list.
+    /// Safe to call at any time after start(); useful when the automatic
+    /// on-connect request missed peers due to the identify race.
+    void request_peers();
+
 private:
     void on_connected(const Peer& peer);
+    void on_peer_identified(const Peer& peer, const std::vector<Address>& addresses);
     void handle(const Peer& peer, ByteView payload);
     void handle_request(const Peer& requester, uint16_t max);
     void handle_response(ByteView body);

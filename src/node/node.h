@@ -140,6 +140,15 @@ public:
     /// peers send their identify message. Useful for NAT awareness / advertising.
     std::vector<Address> observed_addresses() const;
 
+    /// Add a public address discovered via STUN or other means.
+    /// The address is included in the identify exchange and, by extension, in PEX.
+    /// May be called from any thread; thread-safe.
+    void add_public_address(const Address& addr);
+
+    /// Enable STUN probing on start. If servers is empty, built-in defaults are used.
+    /// Call before start().
+    void enable_stun(std::vector<HostEndpoint> servers = {});
+
     // — peer admission limit (0 = unlimited; guards inbound, not our own dials) —
     size_t max_peers() const noexcept { return max_peers_.load(std::memory_order_relaxed); }
     void   set_max_peers(size_t n) noexcept { max_peers_.store(n, std::memory_order_relaxed); }
@@ -164,6 +173,8 @@ public:
     void on_peer_connected(PeerNetwork::PeerEventHandler cb) override { peer_connected_.push_back(std::move(cb)); }
     /// Subscribe to peer-disconnected events. The handler runs on a reactor thread.
     void on_peer_disconnected(PeerNetwork::PeerDisconnectHandler cb) override { peer_disconnected_.push_back(std::move(cb)); }
+    /// Subscribe to peer-identified events (address learned via identify). The handler runs on a reactor thread.
+    void on_peer_identified(PeerNetwork::PeerIdentifiedHandler cb) override { peer_identified_.push_back(std::move(cb)); }
     /// Subscribe to failed-outbound-dial events. The handler runs on a reactor thread.
     void on_dial_failed(PeerNetwork::DialFailedHandler cb) override { dial_failed_.push_back(std::move(cb)); }
     /// Register a handler for inbound messages on a named channel. Additive:
@@ -239,8 +250,12 @@ private:
     std::atomic<bool>   running_{false};
     std::atomic<size_t> max_peers_{0};  ///< established-peer cap; 0 = unlimited
 
+    std::atomic<bool>   stun_enabled_{false};  ///< whether to probe STUN on start
+    std::vector<HostEndpoint> stun_servers_;   ///< custom STUN servers (empty = defaults)
+
     std::vector<PeerNetwork::PeerEventHandler>      peer_connected_;
     std::vector<PeerNetwork::PeerDisconnectHandler> peer_disconnected_;
+    std::vector<PeerNetwork::PeerIdentifiedHandler> peer_identified_;
     std::vector<PeerNetwork::DialFailedHandler>     dial_failed_;
 
     // Our own addresses as peers observe us (their reported IP + our listen port).
@@ -248,11 +263,12 @@ private:
     std::vector<Address> observed_addresses_;
 
     // The dialable addresses we advertise to peers in identify. Derived from local
-    // interfaces (and, in future, promoted observed addresses). Rebuilt once at
-    // start() and on NetworkMonitor changes — never re-enumerated per connection,
-    // since interface enumeration is a syscall and the send path is hot.
+    // interfaces and STUN-discovered external addresses. Rebuilt once at start()
+    // and on NetworkMonitor changes — never re-enumerated per connection, since
+    // interface enumeration is a syscall and the send path is hot.
     mutable std::mutex   advertised_mutex_;
     std::vector<Address> advertised_addresses_;
+    std::optional<Address> public_address_;  ///< externally discovered public address, if any
 };
 
 } // namespace librats
