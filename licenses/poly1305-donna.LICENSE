@@ -1,6 +1,26 @@
-MIT License
+poly1305-donna
+==============
 
-Copyright (c) 2026 librats contributors
+Upstream:  https://github.com/floodyberry/poly1305-donna
+Author:    Andrew Moon (floodyberry)
+
+Used by librats as: src/crypto/poly1305.c, src/crypto/poly1305.h
+
+SPDX-License-Identifier: MIT
+
+---------------------------------------------------------------------------
+
+Upstream carries no separate license file; every upstream source file carries
+the notice below, which librats preserves verbatim in its own copies:
+
+    /*
+     * poly1305-donna
+     * https://github.com/floodyberry/poly1305-donna
+     * MIT license / public domain
+     */
+
+The license is offered as a choice of the MIT license or the public domain.
+librats redistributes this code under the MIT license, whose terms are:
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
