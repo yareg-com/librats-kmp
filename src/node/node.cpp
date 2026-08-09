@@ -424,13 +424,21 @@ void Node::handle_identify(Connection& conn, const Frame& frame) {
         return;
     }
 
-    // The peer's dialable addresses: the address we see it at paired with its
-    // advertised listen port (the linchpin for inbound peers), plus any extra
-    // addresses it self-advertised. PeerTable de-duplicates and caps the set.
+    // The peer's dialable addresses: the address we see it at paired with the
+    // port from the TCP socket (the NAT-mapped port for inbound peers behind NAT),
+    // the advertised listen port, and any extra addresses self-advertised.
+    // PeerTable de-duplicates and caps the set.
     std::vector<Address> candidates;
     const IpAddress seen_ip = conn.remote_ip();
+    // For inbound connections: the TCP source port is the NAT-mapped port.
+    // For cone NATs this is the correct dialable port; for symmetric NATs it's
+    // only valid for connections to us, but having it doesn't hurt.
+    if (auto ep = conn.remote_endpoint()) {
+        if (ep->port != 0 && !ep->ip.is_any())
+            candidates.push_back(*ep);       // {public_ip, nat_mapped_port}
+    }
     if (msg->listen_port != 0 && !seen_ip.is_any())
-        candidates.push_back(Address{seen_ip, msg->listen_port});
+        candidates.push_back(Address{seen_ip, msg->listen_port});  // {public_ip, local_listen_port}
     for (const Address& a : msg->addresses)
         if (a.port != 0 && !a.ip.is_any())
             candidates.push_back(a);
