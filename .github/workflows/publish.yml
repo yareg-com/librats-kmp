@@ -38,7 +38,6 @@ jobs:
         
       - name: Publish to GitHub Packages
         run: |
-          cd kmp
           chmod +x gradlew
           SHORT_SHA="${GITHUB_SHA:0:7}"
           ./gradlew publishAllPublicationsToGitHubPackagesRepository -Pversion="$SHORT_SHA"
