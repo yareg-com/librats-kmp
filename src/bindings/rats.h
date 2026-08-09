@@ -192,6 +192,17 @@ RATS_API rats_error_t rats_request_peers(rats_t node);
 RATS_API char** rats_peer_ids(rats_t node, size_t* count);
 RATS_API void   rats_free_peer_ids(char** ids, size_t count);
 
+/* — public address (learned from peers via identify) — */
+
+/** The node's public address as observed by connected peers (NAT-mapped IP:port).
+ *  Writes the IP to ip_buf (up to ip_buf_len bytes), the port to *port, and returns
+ *  RATS_OK.  Returns RATS_ERR_NOT_ENABLED if no peer has reported our address yet
+ *  (e.g. no inbound connections completed).  The written IP is a numeric string
+ *  like "203.0.113.10" — caller frees nothing. */
+RATS_API rats_error_t rats_get_public_address(rats_t node,
+                                               char* ip_buf, size_t ip_buf_len,
+                                               uint16_t* port);
+
 /* — pub/sub (topic-based, raw bytes; enable + subscribe before start) — */
 
 typedef void (*rats_topic_cb)(void* user, const char* peer_id_hex,

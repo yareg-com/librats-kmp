@@ -92,6 +92,7 @@ object RatsClient {
     external fun nativeSetMaxPeers(ptr: Long, maxPeers: Long)
     external fun nativeOnPeerConnected(ptr: Long, callback: ConnectionCallback): Int
     external fun nativeOnPeerDisconnected(ptr: Long, callback: DisconnectCallback): Int
+    external fun nativeGetPublicAddress(ptr: Long, result: Array<Any?>): Int
 
     //------------------------------------------------------------------------------------------------------------------
     //

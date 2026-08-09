@@ -80,4 +80,21 @@ class Peers(
         }
     )
 
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
+        The node's public address as observed by connected peers (NAT-mapped IP:port).
+        Returns null if no peer has reported our address yet.
+    */
+
+    val publicAddress: Pair<String, Int>?
+        get() {
+            val result = arrayOfNulls<Any?>(2)
+            val err = RatsClient.nativeGetPublicAddress(ptr(), result)
+            if (err != 0) return null
+            val ip = result[0] as? String ?: return null
+            val port = result[1] as? Int ?: return null
+            return ip to port
+        }
+
 }

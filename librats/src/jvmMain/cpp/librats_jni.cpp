@@ -683,6 +683,25 @@ Java_com_librats_RatsClient_nativeRemoveReconnect(JNIEnv* env, jobject, jlong pt
     return rats_remove_reconnect(node_of(ptr), h.c_str(), static_cast<uint16_t>(port));
 }
 
+// ---- public address ----
+
+JNIEXPORT jint JNICALL
+Java_com_librats_RatsClient_nativeGetPublicAddress(JNIEnv* env, jobject, jlong ptr,
+                                                    jobjectArray result) {
+    char ip_buf[64] = {};
+    uint16_t port = 0;
+    rats_error_t err = rats_get_public_address(node_of(ptr), ip_buf, sizeof(ip_buf), &port);
+    if (err != RATS_OK) return static_cast<jint>(err);
+    env->SetObjectArrayElement(result, 0, toJString(env, ip_buf));
+    jclass integer_class = env->FindClass("java/lang/Integer");
+    jmethodID value_of = env->GetStaticMethodID(integer_class, "valueOf", "(I)Ljava/lang/Integer;");
+    jobject port_obj = env->CallStaticObjectMethod(integer_class, value_of, static_cast<jint>(port));
+    env->SetObjectArrayElement(result, 1, port_obj);
+    env->DeleteLocalRef(port_obj);
+    env->DeleteLocalRef(integer_class);
+    return RATS_OK;
+}
+
 // ---- static: logging ----
 
 JNIEXPORT void JNICALL
