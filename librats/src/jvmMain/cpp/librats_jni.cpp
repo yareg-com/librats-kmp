@@ -487,6 +487,31 @@ Java_com_librats_RatsClient_nativeRequestPeers(JNIEnv*, jobject, jlong ptr) {
     return rats_request_peers(node_of(ptr));
 }
 
+JNIEXPORT jint JNICALL
+Java_com_librats_RatsClient_nativeOnPeerDiscovered(JNIEnv* env, jobject, jlong ptr, jobject callback) {
+    jobject global_cb = env->NewGlobalRef(callback);
+    return rats_on_peer_discovered(node_of(ptr),
+        [](void* user, const char* peer_id_hex,
+           const char* const* addresses, size_t address_count) {
+            auto* ctx = static_cast<std::pair<JNIEnv*, jobject>*>(user);
+            JNIEnv* env = ctx->first;
+            jobject cb = ctx->second;
+            jclass cls = env->GetObjectClass(cb);
+            jmethodID mid = env->GetMethodID(cls, "onPeerDiscovered",
+                                              "(Ljava/lang/String;[Ljava/lang/String;)V");
+            jstring jid = env->NewStringUTF(peer_id_hex);
+            jobjectArray jaddrs = env->NewObjectArray(static_cast<jsize>(address_count),
+                                                       env->FindClass("java/lang/String"),
+                                                       nullptr);
+            for (size_t i = 0; i < address_count; ++i)
+                env->SetObjectArrayElement(jaddrs, static_cast<jsize>(i), env->NewStringUTF(addresses[i]));
+            env->CallVoidMethod(cb, mid, jid, jaddrs);
+            env->DeleteLocalRef(jid);
+            env->DeleteLocalRef(jaddrs);
+        },
+        new std::pair<JNIEnv*, jobject>{env, global_cb});
+}
+
 // ---- pub/sub ----
 
 JNIEXPORT jint JNICALL

@@ -55,6 +55,10 @@ void PeerExchange::request_peers() {
         network_->send(id, MessageType::Pex, ByteView(req, kRequestSize));
 }
 
+void PeerExchange::on_peer_discovered(PeerDiscoveredHandler handler) {
+    discovered_handlers_.push_back(std::move(handler));
+}
+
 // ── Outgoing request (on connect) ────────────────────────────────────────────
 
 void PeerExchange::on_connected(const Peer& peer) {
@@ -188,6 +192,7 @@ void PeerExchange::handle_response(ByteView body) {
         if (!should_dial(addr)) continue;                             // cooldown / dedup
 
         LOG_DEBUG("pex", "Discovered peer " << id->short_hex() << " at " << addr.to_string() << "; dialing");
+        for (auto& h : discovered_handlers_) h(*id, std::vector<Address>{addr});
         network_->connect(addr);
         ++dialed;
     }

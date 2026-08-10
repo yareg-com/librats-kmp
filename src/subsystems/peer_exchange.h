@@ -52,6 +52,9 @@ namespace librats {
 
 class RATS_API PeerExchange final : public Subsystem {
 public:
+    using PeerDiscoveredHandler = std::function<void(const PeerId& peer_id,
+                                                     const std::vector<Address>& addresses)>;
+
     struct Config {
         size_t max_addresses_per_response = 32;  ///< cap entries we send / act on per response
         size_t request_max                = 32;  ///< how many peers we ask for on connect
@@ -74,6 +77,10 @@ public:
     /// on-connect request missed peers due to the identify race.
     void request_peers();
 
+    /// Register a callback invoked when a new peer is discovered via PEX.
+    /// Fires after dedup/cooldown but before connect. Multiple handlers allowed.
+    void on_peer_discovered(PeerDiscoveredHandler handler);
+
 private:
     void on_connected(const Peer& peer);
     void on_peer_identified(const Peer& peer, const std::vector<Address>& addresses);
@@ -90,6 +97,7 @@ private:
 
     std::mutex mutex_;
     std::unordered_map<Address, std::chrono::steady_clock::time_point> recent_dials_;
+    std::vector<PeerDiscoveredHandler> discovered_handlers_;
 };
 
 } // namespace librats

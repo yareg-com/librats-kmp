@@ -184,6 +184,18 @@ RATS_API rats_error_t rats_enable_stun(rats_t node, const char* const* servers);
  *  identify race. Returns RATS_ERR_NOT_ENABLED if PEX is not enabled. */
 RATS_API rats_error_t rats_request_peers(rats_t node);
 
+typedef void (*rats_peer_discovered_cb)(void* user,
+                                        const char* peer_id_hex,
+                                        const char* const* address_strings,
+                                        size_t address_count);
+
+/** Register a callback invoked when a new peer is discovered via PEX, before
+ *  the connection is attempted. address_strings is a NULL-terminated array of
+ *  "ip:port" strings; caller must not free it. Call before start(). */
+RATS_API rats_error_t rats_on_peer_discovered(rats_t node,
+                                               rats_peer_discovered_cb cb,
+                                               void* user);
+
 /* — peer enumeration — */
 
 /** Hex ids of currently-connected peers. Writes the count to *count and returns a

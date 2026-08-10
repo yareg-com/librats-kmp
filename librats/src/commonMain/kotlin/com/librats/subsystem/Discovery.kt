@@ -1,6 +1,7 @@
 package com.librats.subsystem
 
 import com.librats.RatsClient
+import com.librats.callback.PeerDiscoveredCallback
 
 class Discovery(
     private val ptr: () -> Long
@@ -91,5 +92,22 @@ class Discovery(
     */
 
     fun requestPeers(): Int = RatsClient.nativeRequestPeers(ptr())
+
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
+        Register a callback invoked when a new peer is discovered via PEX,
+        before the connection is attempted. Call before node start.
+        @param block callback receiving peerId and list of "ip:port" addresses
+    */
+
+    fun onPeerDiscovered(
+        block: (peerId: String, addresses: List<String>) -> Unit
+    ) = RatsClient.nativeOnPeerDiscovered(
+        ptr = ptr(),
+        callback = { peerId, addresses ->
+            block(peerId, addresses.toList())
+        }
+    )
 
 }
