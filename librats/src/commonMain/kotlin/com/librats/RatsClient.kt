@@ -5,6 +5,7 @@ import com.librats.callback.DisconnectCallback
 import com.librats.callback.FileCompleteCallback
 import com.librats.callback.FileOfferCallback
 import com.librats.callback.FileProgressCallback
+import com.librats.callback.PeerDiscoveredCallback
 import com.librats.callback.JsonMessageCallback
 import com.librats.callback.MessageCallback
 import com.librats.callback.TopicMessageCallback
@@ -79,6 +80,7 @@ object RatsClient {
     external fun nativeEnablePex(ptr: Long, publicOnly: Boolean): Int
     external fun nativeEnableStun(ptr: Long, servers: Array<String>?): Int
     external fun nativeRequestPeers(ptr: Long): Int
+    external fun nativeOnPeerDiscovered(ptr: Long, callback: PeerDiscoveredCallback): Int
 
     //------------------------------------------------------------------------------------------------------------------
     //

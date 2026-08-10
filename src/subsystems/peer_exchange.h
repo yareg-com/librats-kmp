@@ -74,6 +74,12 @@ public:
     /// on-connect request missed peers due to the identify race.
     void request_peers();
 
+    /// Register a callback invoked when a new peer is discovered via PEX.
+    /// Fires after dedup/cooldown but before connect.
+    using PeerDiscoveredHandler = std::function<void(const PeerId& peer_id,
+                                                     const std::vector<Address>& addresses)>;
+    void on_peer_discovered(PeerDiscoveredHandler handler);
+
 private:
     void on_connected(const Peer& peer);
     void on_peer_identified(const Peer& peer, const std::vector<Address>& addresses);
@@ -90,6 +96,7 @@ private:
 
     std::mutex mutex_;
     std::unordered_map<Address, std::chrono::steady_clock::time_point> recent_dials_;
+    PeerDiscoveredHandler discovered_handler_;
 };
 
 } // namespace librats

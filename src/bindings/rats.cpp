@@ -337,6 +337,28 @@ rats_error_t rats_request_peers(rats_t node) {
     return RATS_OK;
 }
 
+rats_error_t rats_on_peer_discovered(rats_t node,
+                                     rats_peer_discovered_cb cb, void* user) {
+    auto* h = as_handle(node);
+    if (!h->pex) return RATS_ERR_NOT_ENABLED;
+    h->pex->on_peer_discovered([cb, user](const PeerId& peer_id,
+                                           const std::vector<Address>& addrs) {
+        // Build a NULL-terminated array of "ip:port" strings.
+        std::vector<std::string> strs;
+        strs.reserve(addrs.size());
+        for (const Address& a : addrs)
+            strs.push_back(a.to_string());
+
+        std::vector<const char*> cstrs;
+        cstrs.reserve(strs.size() + 1);
+        for (const std::string& s : strs) cstrs.push_back(s.c_str());
+        cstrs.push_back(nullptr);
+
+        cb(user, peer_id.to_hex().c_str(), cstrs.data(), addrs.size());
+    });
+    return RATS_OK;
+}
+
 /* — peer enumeration — */
 
 char** rats_peer_ids(rats_t node, size_t* count) {
