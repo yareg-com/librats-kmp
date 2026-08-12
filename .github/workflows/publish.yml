@@ -57,9 +57,9 @@ jobs:
       matrix:
         package-name: [
           'com.github.yareg-com.librats',
+          'com.github.yareg-com.librats-jni',
           'com.github.yareg-com.librats-jvm',
-          'com.github.yareg-com.librats-android',
-          'com.github.yareg-com.librats-jni'
+          'com.github.yareg-com.librats-android'
         ]
 
     steps:
