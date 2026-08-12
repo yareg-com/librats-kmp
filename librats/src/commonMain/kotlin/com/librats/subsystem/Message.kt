@@ -1,7 +1,6 @@
 package com.librats.subsystem
 
 import com.librats.RatsClient
-import com.librats.callback.MessageCallback
 
 class Message(
     private val ptr: () -> Long
@@ -52,11 +51,7 @@ class Message(
     ): Int = RatsClient.nativeOn(
         ptr = ptr(),
         channel = channel,
-        callback = object : MessageCallback {
-            override fun onMessage(peerId: String, data: ByteArray) {
-                block(peerId, data)
-            }
-        }
+        callback = block
     )
 
 }

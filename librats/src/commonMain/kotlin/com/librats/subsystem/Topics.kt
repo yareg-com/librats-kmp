@@ -1,7 +1,6 @@
 package com.librats.subsystem
 
 import com.librats.RatsClient
-import com.librats.callback.TopicMessageCallback
 
 class Topics(
     private val ptr: () -> Long
@@ -27,11 +26,7 @@ class Topics(
     ): Int = RatsClient.nativeSubscribe(
         ptr = ptr(),
         topic = topic,
-        callback = object : TopicMessageCallback {
-            override fun onTopicMessage(peerId: String, topic: String, data: ByteArray) {
-                block(peerId, topic, data)
-            }
-        }
+        callback = block
     )
 
     //------------------------------------------------------------------------------------------------------------------

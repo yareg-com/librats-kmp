@@ -1,8 +1,6 @@
 package com.librats.subsystem
 
 import com.librats.RatsClient
-import com.librats.callback.ConnectionCallback
-import com.librats.callback.DisconnectCallback
 
 class Peers(
     private val ptr: () -> Long
@@ -49,6 +47,21 @@ class Peers(
     //------------------------------------------------------------------------------------------------------------------
 
     /**
+        Register a callback invoked when a new peer is discovered via PEX,
+        before the connection is attempted. Call before node start.
+        @param block callback receiving peerId and list of "ip:port" addresses
+     */
+
+    fun onPeerDiscovered(
+        block: (peerId: String, addresses: Array<String>) -> Unit
+    ) = RatsClient.nativeOnPeerDiscovered(
+        ptr = ptr(),
+        callback = block
+    )
+
+    //------------------------------------------------------------------------------------------------------------------
+
+    /**
         Sets the peer-connected callback. Call before node start
     */
 
@@ -56,11 +69,7 @@ class Peers(
         block: (peerId: String) -> Unit
     ) = RatsClient.nativeOnPeerConnected(
         ptr = ptr(),
-        callback = object : ConnectionCallback {
-            override fun onConnected(peerId: String) {
-                block(peerId)
-            }
-        }
+        callback = block
     )
 
     //------------------------------------------------------------------------------------------------------------------
@@ -73,11 +82,7 @@ class Peers(
         block: (peerId: String) -> Unit
     ) = RatsClient.nativeOnPeerDisconnected(
         ptr = ptr(),
-        callback = object : DisconnectCallback {
-            override fun onDisconnected(peerId: String) {
-                block(peerId)
-            }
-        }
+        callback = block
     )
 
     //------------------------------------------------------------------------------------------------------------------
