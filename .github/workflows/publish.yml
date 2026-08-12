@@ -52,6 +52,15 @@ jobs:
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package-name: [
+          'com.github.yareg-com.librats',
+          'com.github.yareg-com.librats-jvm',
+          'com.github.yareg-com.librats-android',
+          'com.github.yareg-com.librats-jni'
+        ]
 
     steps:
       - name: Delete old untagged package versions
@@ -60,7 +69,7 @@ jobs:
           # Delete all untagged versions except the three latest ones.
           # Note: delete-only-untagged-versions only applies to container packages;
           # for Maven packages it is ignored, but min-versions-to-keep still retains 3 latest.
-          package-name: 'com.github.yareg-com.librats'
+          package-name: ${{ matrix.package-name }}
           package-type: 'maven'
           min-versions-to-keep: 3
           delete-only-untagged-versions: true
