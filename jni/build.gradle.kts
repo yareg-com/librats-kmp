@@ -7,6 +7,7 @@ android {
     namespace = "com.librats.jni"
     compileSdk = libs.versions.android.sdk.compile.get().toInt()
     buildToolsVersion = libs.versions.android.build.tools.get()
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         minSdk = 24
@@ -24,7 +25,7 @@ android {
     externalNativeBuild {
         cmake {
             path = file("../android/src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+            version = "4.1.2"
         }
     }
 

@@ -45,3 +45,31 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: publish
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package-name: [
+          'com.github.yareg-com.librats',
+          'com.github.yareg-com.librats-jni',
+          'com.github.yareg-com.librats-jvm',
+          'com.github.yareg-com.librats-android'
+        ]
+
+    steps:
+      - name: Delete old untagged package versions
+        uses: actions/delete-package-versions@v5
+        with:
+          # Delete all untagged versions except the three latest ones.
+          # Note: delete-only-untagged-versions only applies to container packages;
+          # for Maven packages it is ignored, but min-versions-to-keep still retains 3 latest.
+          package-name: ${{ matrix.package-name }}
+          package-type: 'maven'
+          min-versions-to-keep: 3
+          delete-only-untagged-versions: true
