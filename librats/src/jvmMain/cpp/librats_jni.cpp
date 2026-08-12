@@ -17,7 +17,7 @@
 #include <cstdio>
 #include <pthread.h>
 
-#include "bindings/rats.h"
+#include "librats/bindings/rats.h"
 
 #define LOG_TAG "LibRatsJNI"
 #define LOGD(...) do { printf("[%s][DEBUG] ", LOG_TAG); printf(__VA_ARGS__); printf("\n"); } while(0)

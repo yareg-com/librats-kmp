@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "peer/peer_id.h"
-#include "security/identity.h"
-#include "security/noise_security.h"
-#include "security/plaintext_security.h"
+#include "librats/peer/peer_id.h"
+#include "librats/security/identity.h"
+#include "librats/security/noise_security.h"
+#include "librats/security/plaintext_security.h"
 
 #include <memory>
 #include <string>
@@ -148,7 +148,7 @@ TEST(HandshakeTest, PlaintextAlsoGuardsProtocol) {
 
 TEST(PeerIdTest, DerivedFromKeyIsStableAndHex) {
     Identity id = Identity::generate();
-    PeerId again = PeerId::from_public_key(id.static_keypair.public_key, rats::NOISE_DH_SIZE);
+    PeerId again = PeerId::from_public_key(id.static_keypair.public_key, librats::NOISE_DH_SIZE);
     EXPECT_EQ(id.id, again);
     EXPECT_EQ(id.id.to_hex().size(), PeerId::kSize * 2);
 
