@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "bittorrent/peer_connection.h"
-#include "bittorrent/reactor.h"
-#include "bittorrent/types.h"
-#include "core/socket.h"
+#include "librats/bittorrent/peer_connection.h"
+#include "librats/bittorrent/reactor.h"
+#include "librats/bittorrent/types.h"
+#include "librats/core/socket.h"
 
 #include <functional>
 
@@ -89,7 +89,7 @@ protected:
     }
 
     Reactor       r_;
-    socket_t      sa_ = INVALID_SOCKET_VALUE, sb_ = INVALID_SOCKET_VALUE;
+    socket_t      sa_ = RATS_INVALID_SOCKET, sb_ = RATS_INVALID_SOCKET;
     InfoHash      info_{};
     PeerId        pa_{}, pb_{};
     std::uint32_t num_pieces_ = 4;

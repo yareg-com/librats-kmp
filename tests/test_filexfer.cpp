@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "node/node.h"
-#include "subsystems/file_transfer.h"
-#include "util/fs.h"
+#include "librats/node/node.h"
+#include "librats/subsystems/file_transfer.h"
+#include "librats/util/fs.h"
 
 #include <algorithm>
 #include <atomic>
@@ -589,7 +589,7 @@ TEST(FilexferTest, ShaMismatchRejectsAndReclaimsTemp) {
     fe.push_back(4);                        // OP_FILE_END
     put_u64(fe, id);
     put_u32(fe, 0);
-    fe.insert(fe.end(), SHA256_HASH_SIZE, 0xEE);
+    fe.insert(fe.end(), RATS_SHA256_HASH_SIZE, 0xEE);
     p.client->send(p.server->local_id(), MessageType::FileChunk, ByteView(fe));
 
     ASSERT_TRUE(wait_for([&] { return rdone.load(); }));

@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
-#include "node/node.h"
-#include "subsystems/dht_discovery.h"
-#include "nat/stun.h"
-#include "core/socket.h"
-#include "util/fs.h"
+#include "librats/node/node.h"
+#include "librats/subsystems/dht_discovery.h"
+#include "librats/nat/stun.h"
+#include "librats/core/socket.h"
+#include "librats/util/fs.h"
 
 #include <atomic>
 #include <chrono>
@@ -46,7 +46,7 @@ public:
 
     void stop() {
         running_ = false;
-        if (is_valid_socket(socket_)) { close_socket(socket_); socket_ = INVALID_SOCKET_VALUE; }
+        if (is_valid_socket(socket_)) { close_socket(socket_); socket_ = RATS_INVALID_SOCKET; }
         if (thread_.joinable()) thread_.join();
     }
 
@@ -73,7 +73,7 @@ private:
 
     std::string       public_ip_;
     std::atomic<bool> running_{false};
-    socket_t          socket_ = INVALID_SOCKET_VALUE;
+    socket_t          socket_ = RATS_INVALID_SOCKET;
     int               port_ = 0;
     std::thread       thread_;
 };
