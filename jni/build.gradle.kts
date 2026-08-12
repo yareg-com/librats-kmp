@@ -7,6 +7,7 @@ android {
     namespace = "com.librats.jni"
     compileSdk = libs.versions.android.sdk.compile.get().toInt()
     buildToolsVersion = libs.versions.android.build.tools.get()
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         minSdk = 24
