@@ -44,6 +44,10 @@ public:
         return true;
     }
 
+    size_t overhead() const override { return librats::NOISE_TAG_SIZE; }
+    static_assert(librats::NOISE_TAG_SIZE <= librats::kMaxSessionOverhead,
+                  "kMaxSessionOverhead no longer bounds every provider");
+
     const PeerId& remote_id() const override { return remote_id_; }
     bool is_secure() const override { return true; }
 

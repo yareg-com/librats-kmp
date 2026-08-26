@@ -16,13 +16,29 @@
  *     entry to its *other* peers ONLY if the entry actually won (carried new
  *     information). A duplicate loses LWW and is not forwarded, so flooding
  *     terminates naturally — no separate dedup table needed.
- *   - On peer connect, both sides exchange a full snapshot (anti-entropy) so a
- *     late joiner catches up. LWW makes the merge order-independent.
+ *   - On peer connect, both sides exchange a snapshot (anti-entropy) so a late
+ *     joiner catches up. LWW makes the merge order-independent.
+ *
+ * The snapshot exchange is bounded at both ends, because a store has no bound.
+ * The request carries a digest of what the asker already holds, so a converged
+ * pair exchanges no entries at all; the answer leaves as a run of chunks paced
+ * against the link (send() says when to stop, on_peer_writable when to go on),
+ * so a snapshot never has to fit in a connection's send queue all at once. Only
+ * one snapshot per peer is ever in flight, and an entry too large to be framed
+ * at all is skipped rather than allowed to strand the entries behind it.
  *
  * Wire format (MessageType::Storage payload, opcode in byte 0):
  *   ENTRY:         [1][StorageEntry.serialize()]
- *   SYNC_REQUEST:  [2]
- *   SYNC_RESPONSE: [3][count:u32][StorageEntry.serialize()] * count
+ *   SYNC_REQUEST:  [2] then, optionally, [version:u8][flags:u8][count:u32]
+ *                  followed by count x [key hash:u64][timestamp:u64][origin hash:u64]
+ *   SYNC_RESPONSE: [3][count:u32][StorageEntry.serialize()] * count, repeated
+ *                  once per chunk until the snapshot is exhausted
+ *
+ * Everything after byte 0 of SYNC_REQUEST is an extension: the opcode predates
+ * the digest and its handler read no further, so a peer that predates it sends a
+ * bare request and receives the whole snapshot, exactly as it always did. A
+ * chunked response needs no negotiation either — each chunk is a self-contained
+ * SYNC_RESPONSE, and applying entries is idempotent under LWW.
  *
  * The class is also usable standalone (no network attached) as a local,
  * persistent key-value store; all network operations no-op until attach().
@@ -45,6 +61,7 @@
 #include <chrono>
 #include <thread>
 #include <optional>
+#include <utility>
 #include <condition_variable>
 
 namespace librats {
@@ -146,13 +163,34 @@ struct StorageConfig {
     uint32_t max_value_size;            // Maximum value size in bytes
     bool persist_to_disk;               // Whether to persist data to disk
 
+    /// Payload budget for one sync-response chunk. A snapshot is sent as a run of
+    /// chunks paced against the link, never as one message: the store may be
+    /// arbitrarily larger than what a connection's send queue can hold, and a
+    /// single message that does not fit is simply dropped by the transport.
+    /// Clamped to PeerNetwork::max_message_size(), which is a hard cap where this
+    /// is only a target — an entry that alone exceeds the cap cannot be
+    /// replicated at all and is skipped, with a warning.
+    uint32_t sync_chunk_bytes;
+    /// Cap on the number of entries a sync *request* may describe. The digest
+    /// costs 24 bytes per entry and rides in one message, so past this size the
+    /// request omits it and takes the whole snapshot instead — correct, merely
+    /// less frugal. A store bigger than this wants a Merkle scheme, not a list.
+    uint32_t sync_max_digest_entries;
+    /// Floor between snapshot exchanges with the *same* peer. Anti-entropy runs
+    /// on every connect, and a peer that reconnects in a loop would otherwise
+    /// re-request the whole snapshot every time.
+    uint32_t sync_min_interval_ms;
+
     StorageConfig()
         : data_directory("./storage"),
           database_name("rats_storage"),
           enable_sync(true),
           compaction_threshold(1000),
           max_value_size(16 * 1024 * 1024),  // 16MB max value size
-          persist_to_disk(true) {}
+          persist_to_disk(true),
+          sync_chunk_bytes(64 * 1024),
+          sync_max_digest_entries(4096),
+          sync_min_interval_ms(30000) {}
 };
 
 /**
@@ -167,6 +205,10 @@ struct StorageStatistics {
     uint64_t entries_sent;              // Entries sent to peers
     uint64_t sync_requests_received;    // Number of sync requests received
     uint64_t sync_requests_sent;        // Number of sync requests sent
+    /// Entries actually put on the wire answering snapshot requests. What a
+    /// request's digest spares is the gap between this and the store size, so it
+    /// is also how the saving is observed from outside.
+    uint64_t sync_entries_sent;
     std::chrono::steady_clock::time_point last_sync_time;  // Last sync timestamp
     StorageSyncStatus sync_status;      // Current sync status
 };
@@ -284,9 +326,25 @@ public:
     librats::Json get_statistics_json() const;
 
 private:
+    /// What a peer told us it already holds, keyed by a hash of the entry key:
+    /// {timestamp_ms, hash of origin_peer_id}. Used to leave out of a snapshot
+    /// everything the requester demonstrably has — which, in a converged network,
+    /// is all of it.
+    using SyncDigest = std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>>;
+
+    /// Per-peer snapshot state: the keys still owed to that peer and how far the
+    /// pump has got through them, plus when we last asked it for a snapshot.
+    struct PeerSyncState {
+        std::vector<std::string>              queue;       ///< keys still to send
+        size_t                                next = 0;    ///< cursor into `queue`
+        std::chrono::steady_clock::time_point last_request{};
+    };
+
     // Network message handlers (run on a reactor thread).
     void on_storage_message(const PeerId& from, ByteView payload);
     void on_peer_connected(const PeerId& peer_id);
+    void on_peer_writable(const PeerId& peer_id);
+    void on_peer_disconnected(const PeerId& peer_id);
 
     PeerNetwork* network_ = nullptr;
     StorageConfig config_;
@@ -300,6 +358,10 @@ private:
     StorageSyncStatus sync_status_;
     bool initial_sync_complete_;
     std::chrono::steady_clock::time_point last_sync_time_;
+
+    // Per-peer snapshot pumps and request throttle.
+    mutable std::mutex peer_sync_mutex_;
+    std::unordered_map<PeerId, PeerSyncState, PeerId::Hash> peer_sync_;
 
     // Statistics
     mutable std::mutex stats_mutex_;
@@ -320,6 +382,22 @@ private:
     static constexpr uint8_t OP_ENTRY         = 1;
     static constexpr uint8_t OP_SYNC_REQUEST  = 2;
     static constexpr uint8_t OP_SYNC_RESPONSE = 3;
+
+    /// Version of the optional digest appended to OP_SYNC_REQUEST. The opcode
+    /// predates the digest, and its original handler read byte 0 and nothing
+    /// else, so the extra bytes are invisible to a peer that predates them — the
+    /// same forward-compatibility trick IdentifyMessage uses for its transports
+    /// byte. A peer that does not understand the digest answers with the whole
+    /// snapshot, exactly as it always did.
+    static constexpr uint8_t kSyncRequestVersion = 1;
+    /// Bit 0 of the flags byte: a complete digest follows. Clear means "assume I
+    /// have nothing" — either the store is empty or it outgrew the digest cap.
+    static constexpr uint8_t kSyncFlagHasDigest  = 1 << 0;
+    /// Fixed width of one digest record: key hash, timestamp, origin hash.
+    static constexpr size_t  kSyncDigestRecord   = 24;
+    /// Above this many tracked peers, entries whose throttle window has long since
+    /// expired are dropped: the map exists to pace syncs, not to remember everyone.
+    static constexpr size_t  kMaxTrackedPeers    = 256;
 
     // Private methods
     void initialize();
@@ -345,7 +423,15 @@ private:
     void broadcast_entry(const StorageEntry& entry);              ///< to all peers
     void forward_entry(const StorageEntry& entry, const PeerId& except);  ///< re-flood
     void send_sync_request(const PeerId& peer_id);
-    void send_sync_response(const PeerId& peer_id);
+    /// Queue the entries `digest` does not already account for and start pumping.
+    void send_sync_response(const PeerId& peer_id, const SyncDigest& digest);
+    /// Push queued snapshot chunks to `peer_id` until the link says to ease off.
+    /// Resumed from on_peer_writable; that pairing is what keeps a snapshot of any
+    /// size inside the connection's send queue instead of overrunning it.
+    void pump_sync(const PeerId& peer_id);
+    /// True when `entry` need not be sent because `digest` shows the peer holds it
+    /// or something that beats it under LWW.
+    static bool digest_covers(const SyncDigest& digest, const StorageEntry& entry);
 
     // Apply a remote entry with LWW; fills `out_event` and returns true if applied.
     bool apply_remote_entry(const StorageEntry& entry, StorageChangeEvent* out_event);

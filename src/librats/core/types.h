@@ -84,7 +84,12 @@ enum class CloseReason {
     ConnectFailed,     ///< Outbound transport connect never completed.
     HandshakeFailed,   ///< Secure-channel handshake failed or timed out.
     ProtocolError,     ///< Malformed frame / decryption failure on the wire.
-    SlowConsumer,      ///< Send buffer exceeded its high-water mark.
+    /// Reserved. The send queue's high-water mark is enforced by refusing the
+    /// frame (Connection::send returns false), not by dropping the peer — closing
+    /// over it punished the peer for the caller's mistake, and a frame larger
+    /// than the mark could not have been sent however well the caller behaved.
+    /// Kept so the reason code is not reused for something else.
+    SlowConsumer,
     ReactorShutdown,   ///< Reactor is stopping.
     DuplicateConn,     ///< Redundant connection to a peer we already hold; superseded.
     PeerLimit,         ///< Inbound rejected: the configured peer limit is reached.

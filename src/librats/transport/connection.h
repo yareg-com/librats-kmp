@@ -85,16 +85,34 @@ public:
 
 class Connection {
 public:
-    /// High-water mark for the memory held by the send queue; exceeding it closes the
-    /// connection with CloseReason::SlowConsumer.
+    /// Hard cap on the memory held by the send queue. A frame that would carry the
+    /// queue past it is refused by send() — dropped, with the connection left
+    /// intact — rather than queued and then paid for with a disconnect.
+    ///
+    /// Only two kinds of frame are ever refused, and a caller can avoid both:
+    /// one whose framed size exceeds the cap on its own (check the payload
+    /// against Node::max_message_size), and one offered *after* send() has
+    /// already answered false. Everything else is queued.
     static constexpr size_t kDefaultSendHighWater = 8 * 1024 * 1024;
 
     /// Where send() starts answering "no room". A quarter of the hard limit, so a
-    /// caller that heeds the answer never comes near the point where the
-    /// connection is dropped, and one that ignores it is no worse off than before
-    /// this mark existed. This is the whole difference between a transport that
-    /// can be used correctly and one that merely disconnects you.
+    /// caller that heeds the answer never comes near the cap, and one that ignores
+    /// it starts losing frames at the cap rather than losing the peer. This is the
+    /// whole difference between a transport that can be used correctly and one
+    /// that merely disconnects you.
     static constexpr size_t kDefaultSendLowWater = kDefaultSendHighWater / 4;
+
+    /// Worst case bytes send() adds to a payload before queueing it: the block's
+    /// length prefix, the inner message header and the session's AEAD tag.
+    static constexpr size_t kFrameOverhead =
+        framer::kLengthPrefixSize + framer::kHeaderSize + kMaxSessionOverhead;
+
+    /// Largest payload that can ever be queued against a high-water mark of
+    /// `high`. Anything beyond it is unsendable however empty the queue is, so a
+    /// caller with more to move has to chunk it.
+    static constexpr size_t max_payload(size_t high) noexcept {
+        return high > kFrameOverhead ? high - kFrameOverhead : 0;
+    }
 
     /// Queued bytes past which send() stops holding the batch back and writes
     /// immediately. Aggregating below this is what turns a burst of small frames

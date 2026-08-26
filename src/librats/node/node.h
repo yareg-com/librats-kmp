@@ -191,8 +191,10 @@ public:
     /// @return whether that peer's queue still has room. <b>False means stop</b>:
     ///         this message is queued like any other, but the queue is past its
     ///         low-water mark, and an application that keeps going regardless
-    ///         will eventually have the peer dropped as a slow consumer. Wait for
-    ///         on_peer_writable instead. Also false if the peer is not connected.
+    ///         will start losing messages once the queue reaches its hard cap.
+    ///         Wait for on_peer_writable instead. Also false, with nothing
+    ///         queued, if the peer is not connected or the payload is larger
+    ///         than max_message_size().
     bool send(const PeerId& to, std::string_view channel, ByteView payload);
     /// Send raw bytes on a named channel to every connected peer.
     /// @return whether *every* one of them still has room — a fan-out can only
@@ -211,6 +213,12 @@ public:
     /// message handed over a moment ago may not be counted yet, which is why the
     /// signal to stop is the *return of send()* rather than a poll before it.
     bool peer_writable(const PeerId& id) const;
+
+    /// The largest payload send() or broadcast() will ever queue — the configured
+    /// send-queue limit less framing and cipher overhead. A message past it does
+    /// not fit however empty the queue is and is refused outright, so anything
+    /// bulky has to be chunked and the chunks paced against send()'s answer.
+    size_t max_message_size() const override;
 
     // — events (register before start(); invoked on a reactor thread). Multiple
     //   listeners are supported, so subsystems and the app can both subscribe. —
@@ -268,10 +276,16 @@ private:
     Peer make_peer(const PeerId& id, PeerRoute route) { return Peer(id, route, *this); }
     void route_send(PeerRoute route, FrameHeader header, Bytes payload,
                     std::shared_ptr<std::atomic<size_t>> owed = nullptr);
+    /// The configured hard cap on one peer's send queue (the library default when
+    /// unset). The low-water mark and max_message_size() both derive from it, so
+    /// the three cannot drift apart.
+    size_t send_queue_limit() const noexcept;
     /// Bytes a peer may have queued (in the connection) or in transit to its
-    /// reactor before send() starts answering "no room". Derived from the same
-    /// config knob that sets the hard limit, so the two cannot drift apart.
+    /// reactor before send() starts answering "no room".
     size_t send_low_water() const noexcept;
+    /// Whether a payload of this size can be queued at all; logs and returns
+    /// false when it cannot. `to` is only for the message (zero id = broadcast).
+    bool   fits_send_queue(const PeerId& to, size_t payload) const;
     void route_close(PeerRoute route);
 
     // — identify: how peers learn each other's dialable addresses (reactor thread) —

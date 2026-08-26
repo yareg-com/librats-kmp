@@ -660,6 +660,7 @@ if(RATS_BUILD_TESTS)
         tests/test_frame.cpp
         tests/test_reactor.cpp
         tests/test_transport_udp.cpp
+        tests/test_transport_backpressure.cpp
         tests/test_relay_link.cpp
         tests/test_dialer.cpp
         tests/test_peer_table.cpp

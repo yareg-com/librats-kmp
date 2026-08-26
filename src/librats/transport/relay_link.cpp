@@ -179,9 +179,11 @@ Link::IoResult Circuit::write(const ByteView* slices, size_t count) {
     if (taken == 0) return {0, Link::Status::WouldBlock};
 
     send_credit_ -= static_cast<uint32_t>(taken);
-    // The carrier queues what it is given either way; false is "stop and wait", so
-    // the bytes are ours to report as written and the block applies to the NEXT
-    // call (see CircuitCarrier::circuit_send_data).
+    // The carrier queues what it is given — a chunk is kMaxDataChunk at most, far
+    // inside any send-queue limit — so false is "stop and wait", the bytes are
+    // ours to report as written, and the block applies to the NEXT call. Reporting
+    // them written on a chunk that had in fact been dropped would tear a hole in
+    // the byte stream, and the far end's end-to-end cipher would never recover.
     if (!carrier_->circuit_send_data(id_, parts, nparts)) carrier_blocked_ = true;
     return {taken, Link::Status::Ok};
 }

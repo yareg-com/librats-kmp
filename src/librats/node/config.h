@@ -52,14 +52,17 @@ struct RATS_API NodeConfig {
     /// connection. 0 disables the fallback: only the preferred transport is tried.
     uint32_t transport_fallback_ms = 1200;
 
-    /// Bytes a peer's send queue may hold before the peer is dropped as a slow
-    /// consumer. 0 uses the library default (8 MiB).
+    /// Hard cap on the bytes a peer's send queue may hold. 0 uses the library
+    /// default (8 MiB). A frame that would carry the queue past it is refused —
+    /// send() returns false and the frame is dropped — while the peer itself is
+    /// left connected. It also bounds Node::max_message_size(): anything bulkier
+    /// than that does not fit however empty the queue is, so it must be chunked.
     ///
     /// A quarter of this is the mark at which send() starts answering "no room"
     /// and on_peer_writable is what says the room is back — so lowering it makes
     /// an application feel backpressure sooner, and raising it lets a bursty one
     /// buffer more before anything is said. The two move together on purpose:
-    /// a warning that arrives at the same moment as the disconnection is no
+    /// a warning that arrives only once frames are already being dropped is no
     /// warning at all.
     size_t send_queue_limit = 0;
 

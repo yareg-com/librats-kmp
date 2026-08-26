@@ -4,6 +4,8 @@
 #include "librats/util/fs.h"
 #include "librats/util/logger.h"
 #include <algorithm>
+#include <iterator>
+#include <utility>
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
@@ -20,6 +22,42 @@ namespace {
 
 void put_u32(std::vector<uint8_t>& b, uint32_t v) {
     for (int i = 3; i >= 0; --i) b.push_back(static_cast<uint8_t>((v >> (i * 8)) & 0xFF));
+}
+
+/// Overwrite the four bytes at `pos` — for a count that is only known once the
+/// message it heads is complete.
+void put_u32_at(std::vector<uint8_t>& b, size_t pos, uint32_t v) {
+    for (int i = 0; i < 4; ++i) b[pos + i] = static_cast<uint8_t>((v >> ((3 - i) * 8)) & 0xFF);
+}
+
+void put_u64(std::vector<uint8_t>& b, uint64_t v) {
+    for (int i = 7; i >= 0; --i) b.push_back(static_cast<uint8_t>((v >> (i * 8)) & 0xFF));
+}
+
+uint32_t get_u32(const uint8_t* p) {
+    return (static_cast<uint32_t>(p[0]) << 24) | (static_cast<uint32_t>(p[1]) << 16) |
+           (static_cast<uint32_t>(p[2]) << 8)  |  static_cast<uint32_t>(p[3]);
+}
+
+uint64_t get_u64(const uint8_t* p) {
+    uint64_t v = 0;
+    for (int i = 0; i < 8; ++i) v = (v << 8) | p[i];
+    return v;
+}
+
+/// FNV-1a. The digest identifies entries by hash rather than by key so that a
+/// request describing a whole store stays a fixed 24 bytes per entry regardless
+/// of how long the keys are. Deliberately not a cryptographic hash: at 64 bits a
+/// collision between two keys held by the same pair of nodes is remote, and its
+/// cost is bounded — one entry left out of one snapshot, carried by the next
+/// write to it or the next sync, never a divergence that persists.
+uint64_t hash64(const std::string& s) {
+    uint64_t h = 1469598103934665603ull;
+    for (unsigned char c : s) {
+        h ^= c;
+        h *= 1099511628211ull;
+    }
+    return h;
 }
 
 } // namespace
@@ -357,6 +395,13 @@ void StorageManager::attach(NodeContext& ctx) {
         [this](const Peer& peer, ByteView payload) { on_storage_message(peer.id(), payload); });
     network_->on_peer_connected(
         [this](const Peer& peer) { on_peer_connected(peer.id()); });
+    // A snapshot leaves as a run of chunks paced against the link: send() says
+    // when to stop offering, and this says when there is room again. Without the
+    // second half the first half is just a stall.
+    network_->on_peer_writable(
+        [this](const Peer& peer) { on_peer_writable(peer.id()); });
+    network_->on_peer_disconnected(
+        [this](const PeerId& id) { on_peer_disconnected(id); });
 }
 
 void StorageManager::start() {
@@ -865,6 +910,7 @@ librats::Json StorageManager::get_statistics_json() const {
     result["entries_sent"] = stats.entries_sent;
     result["sync_requests_received"] = stats.sync_requests_received;
     result["sync_requests_sent"] = stats.sync_requests_sent;
+    result["sync_entries_sent"] = stats.sync_entries_sent;
 
     switch (stats.sync_status) {
         case StorageSyncStatus::NOT_STARTED: result["sync_status"] = "not_started"; break;
@@ -917,7 +963,32 @@ void StorageManager::on_storage_message(const PeerId& from, ByteView payload) {
             std::lock_guard<std::mutex> lock(stats_mutex_);
             stats_.sync_requests_received++;
         }
-        send_sync_response(from);
+
+        // [op][version][flags][count:u32] then count x 24-byte records. Everything
+        // after byte 0 is an extension: the original request was a lone opcode and
+        // the original handler read no further, so a peer that predates the digest
+        // simply sends one and gets the whole snapshot — which is what this falls
+        // back to whenever the digest is absent, truncated or of a version we do
+        // not know.
+        SyncDigest digest;
+        constexpr size_t kHeader = 1 + 1 + 1 + 4;
+        if (n >= kHeader && p[1] == kSyncRequestVersion && (p[2] & kSyncFlagHasDigest)) {
+            const uint32_t entries = get_u32(p + 3);
+            // Never trust the count: only walk records the payload actually holds.
+            const size_t available = (n - kHeader) / kSyncDigestRecord;
+            const size_t usable = (std::min)(static_cast<size_t>(entries), available);
+            if (usable < entries) {
+                LOG_STORAGE_WARN("Truncated sync digest from " << from.short_hex() << ": claimed "
+                                 << entries << ", carried " << available);
+            }
+            digest.reserve(usable);
+            for (size_t i = 0; i < usable; i++) {
+                const uint8_t* rec = p + kHeader + i * kSyncDigestRecord;
+                digest.emplace(get_u64(rec), std::make_pair(get_u64(rec + 8), get_u64(rec + 16)));
+            }
+        }
+
+        send_sync_response(from, digest);
     } else if (op == OP_SYNC_RESPONSE) {
         // [3][count:u32][entry]*
         if (n < 5) return;
@@ -962,14 +1033,56 @@ void StorageManager::on_storage_message(const PeerId& from, ByteView payload) {
 void StorageManager::on_peer_connected(const PeerId& peer_id) {
     if (!config_.enable_sync) return;
 
-    // Anti-entropy: ask the new peer for a full snapshot. Both ends do this on
-    // connect, so the two databases converge via LWW.
+    // Anti-entropy: ask the new peer for a snapshot of what we are missing. Both
+    // ends do this on connect, so the two databases converge via LWW.
+    const auto now = std::chrono::steady_clock::now();
+    {
+        std::lock_guard<std::mutex> lock(peer_sync_mutex_);
+
+        // Keep the map from growing with every peer ever seen. Anything whose
+        // throttle window has long expired is carrying no information.
+        if (peer_sync_.size() > kMaxTrackedPeers) {
+            const auto stale = std::chrono::milliseconds(config_.sync_min_interval_ms) * 4;
+            for (auto it = peer_sync_.begin(); it != peer_sync_.end();) {
+                it = (it->second.queue.empty() && now - it->second.last_request > stale)
+                         ? peer_sync_.erase(it) : std::next(it);
+            }
+        }
+
+        PeerSyncState& st = peer_sync_[peer_id];
+        if (st.last_request.time_since_epoch().count() != 0 &&
+            now - st.last_request < std::chrono::milliseconds(config_.sync_min_interval_ms)) {
+            // A peer reconnecting in a loop must not re-trigger a snapshot every
+            // time. Live writes still reach it: gossip does not go through here.
+            LOG_STORAGE_DEBUG("Skipping snapshot request to " << peer_id.short_hex()
+                              << ": synced with it recently");
+            return;
+        }
+        st.last_request = now;
+    }
+
     {
         std::lock_guard<std::mutex> lock(sync_mutex_);
         if (sync_status_ == StorageSyncStatus::NOT_STARTED)
             sync_status_ = StorageSyncStatus::IN_PROGRESS;
     }
     send_sync_request(peer_id);
+}
+
+void StorageManager::on_peer_writable(const PeerId& peer_id) {
+    // The link has drained back under its mark, so the snapshot may go on.
+    pump_sync(peer_id);
+}
+
+void StorageManager::on_peer_disconnected(const PeerId& peer_id) {
+    std::lock_guard<std::mutex> lock(peer_sync_mutex_);
+    auto it = peer_sync_.find(peer_id);
+    if (it == peer_sync_.end()) return;
+
+    // Drop what is still owed — the route is gone — but keep last_request, which
+    // is precisely what throttles the reconnect that is probably coming next.
+    it->second.queue.clear();
+    it->second.next = 0;
 }
 
 //=============================================================================
@@ -1063,7 +1176,44 @@ void StorageManager::forward_entry(const StorageEntry& entry, const PeerId& exce
 void StorageManager::send_sync_request(const PeerId& peer_id) {
     if (!network_) return;
 
-    std::vector<uint8_t> msg{OP_SYNC_REQUEST};
+    // [op][version][flags][count:u32] then count x {key hash, timestamp, origin hash}.
+    // Telling the peer what we already hold is what turns anti-entropy between two
+    // converged stores from "send me everything" into an exchange that carries no
+    // entries at all — which, after the first sync, is nearly every exchange.
+    std::vector<uint8_t> msg{OP_SYNC_REQUEST, kSyncRequestVersion, 0};
+
+    std::vector<uint8_t> digest;
+    uint32_t count = 0;
+    bool have_digest = false;
+    {
+        std::lock_guard<std::mutex> lock(storage_mutex_);
+        if (entries_.size() <= config_.sync_max_digest_entries) {
+            digest.reserve(entries_.size() * kSyncDigestRecord);
+            for (const auto& pair : entries_) {
+                put_u64(digest, hash64(pair.first));
+                put_u64(digest, pair.second.timestamp_ms);
+                put_u64(digest, hash64(pair.second.origin_peer_id));
+                count++;
+            }
+            have_digest = true;
+        }
+    }
+
+    if (have_digest) {
+        msg[2] = kSyncFlagHasDigest;
+    } else {
+        // Past the cap the digest would be a message in its own right. Ask without
+        // one: the peer sends the whole snapshot, which is correct and — now that
+        // it travels in paced chunks — no longer dangerous, merely wasteful.
+        count = 0;
+        digest.clear();
+        LOG_STORAGE_DEBUG("Store exceeds the digest cap (" << config_.sync_max_digest_entries
+                          << "); requesting a full snapshot from " << peer_id.short_hex());
+    }
+
+    put_u32(msg, count);
+    msg.insert(msg.end(), digest.begin(), digest.end());
+
     network_->send(peer_id, MessageType::Storage, ByteView(msg));
 
     {
@@ -1071,32 +1221,155 @@ void StorageManager::send_sync_request(const PeerId& peer_id) {
         stats_.sync_requests_sent++;
     }
 
-    LOG_STORAGE_DEBUG("Sent sync request to peer " << peer_id.short_hex());
+    LOG_STORAGE_DEBUG("Sent sync request to peer " << peer_id.short_hex()
+                      << " describing " << count << " entries");
 }
 
-void StorageManager::send_sync_response(const PeerId& peer_id) {
+bool StorageManager::digest_covers(const SyncDigest& digest, const StorageEntry& entry) {
+    const auto it = digest.find(hash64(entry.key));
+    if (it == digest.end()) return false;
+
+    const uint64_t their_ts     = it->second.first;
+    const uint64_t their_origin = it->second.second;
+
+    // Strictly newer over there: ours would lose LWW anyway.
+    if (their_ts > entry.timestamp_ms) return true;
+    // Same timestamp and same origin: the very same entry.
+    if (their_ts == entry.timestamp_ms && their_origin == hash64(entry.origin_peer_id)) return true;
+
+    // Anything else — older, or a same-timestamp write from a different origin,
+    // where LWW breaks the tie on the origin id — gets sent. Skipping only what
+    // the peer has already shown us keeps the digest an optimisation rather than
+    // a filter that decides what a peer is allowed to learn.
+    return false;
+}
+
+void StorageManager::send_sync_response(const PeerId& peer_id, const SyncDigest& digest) {
     if (!network_) return;
 
-    std::vector<uint8_t> msg;
-    msg.push_back(OP_SYNC_RESPONSE);
-
-    uint32_t count = 0;
-    std::vector<uint8_t> entries_blob;
+    // Queue the keys this peer is missing; the pump turns them into chunks. The
+    // snapshot is deliberately not built here: it may be far larger than what the
+    // connection can hold, and materialising it whole is the very thing that made
+    // a big store unsendable.
+    std::vector<std::string> owed;
+    size_t skipped = 0;
     {
-        std::lock_guard<std::mutex> lock(storage_mutex_);
-        for (const auto& pair : entries_) {
-            std::vector<uint8_t> serialized = pair.second.serialize();
-            entries_blob.insert(entries_blob.end(), serialized.begin(), serialized.end());
-            count++;
+        // Lock order is peer_sync_ then storage_, everywhere.
+        std::lock_guard<std::mutex> lock(peer_sync_mutex_);
+        PeerSyncState& st = peer_sync_[peer_id];
+
+        // One snapshot at a time per peer. Answering a request is a walk of the
+        // whole store plus a copy of every key it owes, so a peer that asks in a
+        // loop would otherwise buy that work as often as it likes. Whatever it
+        // still needs after this snapshot lands, its next request will carry.
+        if (st.next < st.queue.size()) {
+            LOG_STORAGE_DEBUG("Ignoring a sync request from " << peer_id.short_hex()
+                              << ": a snapshot for it is still in flight");
+            return;
         }
+
+        std::lock_guard<std::mutex> slock(storage_mutex_);
+        owed.reserve(entries_.size());
+        for (const auto& pair : entries_) {
+            if (digest_covers(digest, pair.second)) { skipped++; continue; }
+            owed.push_back(pair.first);
+        }
+        st.queue = std::move(owed);
+        st.next  = 0;
     }
 
-    put_u32(msg, count);
-    msg.insert(msg.end(), entries_blob.begin(), entries_blob.end());
+    LOG_STORAGE_DEBUG("Snapshot for peer " << peer_id.short_hex() << ": " << skipped
+                      << " entries already held by the requester");
+    pump_sync(peer_id);
+}
 
-    network_->send(peer_id, MessageType::Storage, ByteView(msg));
+void StorageManager::pump_sync(const PeerId& peer_id) {
+    if (!network_ || !config_.enable_sync) return;
 
-    LOG_STORAGE_DEBUG("Sent sync response to peer " << peer_id.short_hex() << " with " << count << " entries");
+    // A chunk is [op][count:u32] then entries. The configured budget is a target;
+    // the network's cap is not, so the smaller of the two wins — a chunk built
+    // past the cap would be refused outright, and the pump would then wait for a
+    // writability event that is never coming.
+    constexpr size_t kChunkHeader = 1 + 4;
+    const size_t wanted = config_.sync_chunk_bytes ? config_.sync_chunk_bytes : 64u * 1024;
+    const size_t budget = (std::min)(wanted, network_->max_message_size());
+    const size_t max_entry = budget > kChunkHeader ? budget - kChunkHeader : 0;
+
+    for (;;) {
+        std::vector<uint8_t> msg;
+        uint32_t count = 0;
+
+        {
+            // The cursor moves before the lock is dropped: this pump can be
+            // re-entered from the writable callback on another reactor thread,
+            // and two runs must never claim the same keys.
+            std::lock_guard<std::mutex> lock(peer_sync_mutex_);
+            auto it = peer_sync_.find(peer_id);
+            if (it == peer_sync_.end()) return;
+            PeerSyncState& st = it->second;
+
+            if (st.next >= st.queue.size()) {
+                if (!st.queue.empty()) {
+                    LOG_STORAGE_DEBUG("Snapshot to peer " << peer_id.short_hex() << " complete");
+                    st.queue.clear();
+                    st.next = 0;
+                }
+                return;
+            }
+
+            msg.push_back(OP_SYNC_RESPONSE);
+            put_u32(msg, 0);  // patched below, once the chunk is closed
+
+            std::lock_guard<std::mutex> slock(storage_mutex_);
+            while (st.next < st.queue.size()) {
+                const std::string& key = st.queue[st.next];
+                const auto found = entries_.find(key);
+                if (found == entries_.end()) {  // removed since the snapshot began
+                    st.next++;
+                    continue;
+                }
+
+                const std::vector<uint8_t> serialized = found->second.serialize();
+                // An entry too big for a message of its own is skipped rather than
+                // offered: the link would refuse it, and stopping on that refusal
+                // would strand every entry behind it too. Such an entry is simply
+                // not replicable at this send-queue limit — live writes cannot
+                // carry it either — so say so and move on.
+                if (serialized.size() > max_entry) {
+                    LOG_STORAGE_WARN("Entry '" << key << "' (" << serialized.size()
+                                     << " B) exceeds what one message may carry ("
+                                     << max_entry << " B); skipping it in the snapshot for "
+                                     << peer_id.short_hex());
+                    st.next++;
+                    continue;
+                }
+                // Entries are not splittable, so a chunk closes *before* the entry
+                // that would overrun it — that entry opens the next one. The first
+                // entry always goes in: it fits the budget on its own by the check
+                // above, and a chunk of nothing would make no progress.
+                if (count != 0 && msg.size() + serialized.size() > budget) break;
+
+                st.next++;
+                msg.insert(msg.end(), serialized.begin(), serialized.end());
+                count++;
+            }
+
+            put_u32_at(msg, 1, count);  // the count is only known now
+        }
+
+        if (count == 0) continue;  // the run held only keys that have since gone
+
+        LOG_STORAGE_DEBUG("Sent sync chunk to peer " << peer_id.short_hex() << " with "
+                          << count << " entries (" << msg.size() << " B)");
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            stats_.sync_entries_sent += count;
+        }
+
+        // The chunk is queued either way; false only means the link is at its
+        // mark. Stop offering — on_peer_writable resumes from the same cursor.
+        if (!network_->send(peer_id, MessageType::Storage, ByteView(msg))) return;
+    }
 }
 
 bool StorageManager::apply_remote_entry(const StorageEntry& entry, StorageChangeEvent* out_event) {

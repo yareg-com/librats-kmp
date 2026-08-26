@@ -4,6 +4,7 @@
 #include "librats/util/fs.h"
 #include "test_paths.h"
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <string>
@@ -626,6 +627,360 @@ TEST_F(StorageReplicationTest, SnapshotSyncOnConnect) {
         auto v2 = cli->get_int("k2");
         return v1.has_value() && *v1 == "v1" && v2.has_value() && *v2 == 99;
     })) << "client did not catch up via snapshot sync";
+
+    client.stop();
+    server.stop();
+}
+
+
+//=============================================================================
+// Snapshot Sync: chunking, backpressure, digest and throttle
+//=============================================================================
+
+// The snapshot exchange used to be one message holding the entire store, sent on
+// every connect and in both directions. Two things followed once a store grew
+// past what a connection's send queue may hold: the message became unsendable,
+// and the attempt cost the connection. Since the store only ever grows, a peer
+// that crossed the line never got back under it -- it reconnected, tried the
+// same snapshot, lost the connection again, roughly once a second, forever.
+//
+// These tests pin the three things that keep that from happening: chunks paced
+// against the link, a digest so a converged pair carries nothing, and a floor
+// between snapshots with the same peer.
+
+namespace {
+
+NodeConfig sync_node_config(bool listen, size_t queue_limit = 0) {
+    NodeConfig c = storage_node_config(listen);
+    c.send_queue_limit = queue_limit;
+    return c;
+}
+
+StorageConfig sync_storage_config(uint32_t chunk_bytes = 16 * 1024,
+                                  uint32_t min_interval_ms = 0) {
+    StorageConfig c = mem_storage_config();
+    c.sync_chunk_bytes = chunk_bytes;
+    c.sync_min_interval_ms = min_interval_ms;
+    return c;
+}
+
+// Distinct, incompressible-ish payload so a truncated or duplicated entry shows
+// up as a value mismatch rather than passing by accident.
+std::string filler(size_t n, int seed) {
+    std::string s;
+    s.reserve(n);
+    for (size_t i = 0; i < n; i++) s.push_back(static_cast<char>('a' + ((i + seed * 7) % 26)));
+    return s;
+}
+
+} // namespace
+
+// The regression: a store far larger than the connection's send queue syncs in
+// full, and the peers stay connected the whole way through. Before chunking this
+// was one oversized message; the transport now refuses such a frame rather than
+// closing, so without chunking the snapshot would simply never arrive -- which
+// this test would catch just as surely as the reset it replaced.
+TEST_F(StorageReplicationTest, SnapshotLargerThanTheSendQueueStillSyncs) {
+    // Deliberately small, so "larger than the queue" is a few hundred KB and the
+    // test stays fast. 64 KiB queue, 40 x 8 KiB entries = ~320 KiB of snapshot.
+    constexpr size_t kQueueLimit = 64 * 1024;
+    constexpr int    kEntries    = 40;
+    constexpr size_t kValueSize  = 8 * 1024;
+
+    Node server(sync_node_config(true, kQueueLimit));
+    Node client(sync_node_config(false, kQueueLimit));
+
+    auto server_store = std::make_unique<StorageManager>(sync_storage_config());
+    auto client_store = std::make_unique<StorageManager>(sync_storage_config());
+    StorageManager* srv = server_store.get();
+    StorageManager* cli = client_store.get();
+
+    server.add_subsystem(std::move(server_store));
+    client.add_subsystem(std::move(client_store));
+
+    ASSERT_TRUE(server.start());
+
+    for (int i = 0; i < kEntries; i++) {
+        ASSERT_TRUE(srv->put("big_key_" + std::to_string(i), filler(kValueSize, i)));
+    }
+    ASSERT_EQ(srv->size(), static_cast<size_t>(kEntries));
+
+    ASSERT_TRUE(client.start());
+    client.connect("127.0.0.1", server.listen_port());
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 1 && server.peer_count() == 1; }))
+        << "peers did not connect";
+
+    ASSERT_TRUE(wait_for([&] { return cli->size() == static_cast<size_t>(kEntries); }, 30s))
+        << "snapshot did not arrive in full: got " << cli->size() << " of " << kEntries;
+
+    // Every value byte-exact, not merely the right number of keys.
+    for (int i = 0; i < kEntries; i++) {
+        const auto v = cli->get_string("big_key_" + std::to_string(i));
+        ASSERT_TRUE(v.has_value()) << "missing big_key_" << i;
+        EXPECT_EQ(*v, filler(kValueSize, i)) << "corrupt big_key_" << i;
+    }
+
+    // And the link is still up: this is the part that used to fail.
+    EXPECT_EQ(client.peer_count(), 1u) << "client lost the peer while syncing";
+    EXPECT_EQ(server.peer_count(), 1u) << "server lost the peer while syncing";
+
+    client.stop();
+    server.stop();
+}
+
+// Once two stores have converged, the digest in a request means the answer
+// carries no entries at all. This is what turns the steady state from "resend
+// the whole store on every connect" into an exchange that costs a few hundred
+// bytes -- in the observed failure every single snapshot applied 0 entries.
+TEST_F(StorageReplicationTest, DigestSparesEntriesThePeerAlreadyHolds) {
+    constexpr int kEntries = 25;
+
+    Node server(sync_node_config(true));
+    Node client(sync_node_config(false));
+
+    // No throttle, so the second connect really does ask again.
+    auto server_store = std::make_unique<StorageManager>(sync_storage_config(16 * 1024, 0));
+    auto client_store = std::make_unique<StorageManager>(sync_storage_config(16 * 1024, 0));
+    StorageManager* srv = server_store.get();
+    StorageManager* cli = client_store.get();
+
+    server.add_subsystem(std::move(server_store));
+    client.add_subsystem(std::move(client_store));
+
+    ASSERT_TRUE(server.start());
+    for (int i = 0; i < kEntries; i++) {
+        ASSERT_TRUE(srv->put("k" + std::to_string(i), filler(64, i)));
+    }
+
+    ASSERT_TRUE(client.start());
+    client.connect("127.0.0.1", server.listen_port());
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 1 && server.peer_count() == 1; }));
+    ASSERT_TRUE(wait_for([&] { return cli->size() == static_cast<size_t>(kEntries); }, 20s))
+        << "first sync did not complete";
+
+    const uint64_t after_first = srv->get_statistics().sync_entries_sent;
+    EXPECT_GE(after_first, static_cast<uint64_t>(kEntries))
+        << "the first sync should have carried the whole store";
+
+    // Reconnect. The client now holds everything the server does, and says so.
+    client.stop();
+    ASSERT_TRUE(wait_for([&] { return server.peer_count() == 0; }));
+
+    ASSERT_TRUE(client.start());
+    client.connect("127.0.0.1", server.listen_port());
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 1 && server.peer_count() == 1; }));
+
+    // Give the second exchange room to happen before judging that it carried
+    // nothing -- an assertion that passes because nothing has run yet is no test.
+    ASSERT_TRUE(wait_for([&] {
+        return srv->get_statistics().sync_requests_received >= 2;
+    }, 20s)) << "the second request never reached the server";
+    std::this_thread::sleep_for(300ms);
+
+    EXPECT_EQ(srv->get_statistics().sync_entries_sent, after_first)
+        << "a converged peer must be sent no entries at all";
+    EXPECT_EQ(cli->size(), static_cast<size_t>(kEntries));
+
+    client.stop();
+    server.stop();
+}
+
+// A digest must never cost a write. An entry the requester does not have, and an
+// entry it has an older version of, are both sent even though the rest is
+// skipped -- the digest is an optimisation, not a filter that can lose data.
+TEST_F(StorageReplicationTest, DigestStillCarriesWhatThePeerIsMissingOrHasStale) {
+    Node server(sync_node_config(true));
+    Node client(sync_node_config(false));
+
+    auto server_store = std::make_unique<StorageManager>(sync_storage_config(16 * 1024, 0));
+    auto client_store = std::make_unique<StorageManager>(sync_storage_config(16 * 1024, 0));
+    StorageManager* srv = server_store.get();
+    StorageManager* cli = client_store.get();
+
+    server.add_subsystem(std::move(server_store));
+    client.add_subsystem(std::move(client_store));
+
+    ASSERT_TRUE(server.start());
+    ASSERT_TRUE(srv->put("shared", std::string("v1")));
+    ASSERT_TRUE(srv->put("only_on_server", std::string("server_value")));
+
+    ASSERT_TRUE(client.start());
+    client.connect("127.0.0.1", server.listen_port());
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 1 && server.peer_count() == 1; }));
+    ASSERT_TRUE(wait_for([&] { return cli->size() == 2; }, 20s)) << "first sync did not complete";
+
+    // Move "shared" on while the two are apart, so the client's copy goes stale.
+    client.stop();
+    ASSERT_TRUE(wait_for([&] { return server.peer_count() == 0; }));
+
+    std::this_thread::sleep_for(20ms);  // a distinct LWW timestamp
+    ASSERT_TRUE(srv->put("shared", std::string("v2")));
+    ASSERT_TRUE(srv->put("added_while_apart", std::string("late")));
+
+    ASSERT_TRUE(client.start());
+    client.connect("127.0.0.1", server.listen_port());
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 1 && server.peer_count() == 1; }));
+
+    EXPECT_TRUE(wait_for([&] {
+        const auto shared = cli->get_string("shared");
+        return cli->size() == 3 && shared.has_value() && *shared == "v2";
+    }, 20s)) << "the digest skipped an entry the peer actually needed";
+
+    const auto late = cli->get_string("added_while_apart");
+    ASSERT_TRUE(late.has_value());
+    EXPECT_EQ(*late, "late");
+
+    client.stop();
+    server.stop();
+}
+
+// A peer reconnecting in a loop must not re-trigger a snapshot every time. This
+// is the amplifier in the observed failure: the reconnect was ~1/s and every one
+// of them asked for the store again.
+TEST_F(StorageReplicationTest, RepeatedConnectsAreThrottled) {
+    Node server(sync_node_config(true));
+    Node client(sync_node_config(false));
+
+    // A window far longer than the test: the second connect falls inside it.
+    auto server_store = std::make_unique<StorageManager>(sync_storage_config(16 * 1024, 60000));
+    auto client_store = std::make_unique<StorageManager>(sync_storage_config(16 * 1024, 60000));
+    StorageManager* srv = server_store.get();
+    StorageManager* cli = client_store.get();
+
+    server.add_subsystem(std::move(server_store));
+    client.add_subsystem(std::move(client_store));
+
+    ASSERT_TRUE(server.start());
+    ASSERT_TRUE(srv->put("k", std::string("v")));
+
+    ASSERT_TRUE(client.start());
+    client.connect("127.0.0.1", server.listen_port());
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 1 && server.peer_count() == 1; }));
+    ASSERT_TRUE(wait_for([&] { return cli->size() == 1; }, 20s));
+
+    const uint64_t requests_after_first = cli->get_statistics().sync_requests_sent;
+    EXPECT_GE(requests_after_first, 1u);
+
+    // Reconnect without stopping the node, so the throttle state survives.
+    {
+        auto handle = client.peer(server.local_id());
+        ASSERT_TRUE(handle.has_value());
+        handle->disconnect();
+    }
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 0; }));
+    client.connect("127.0.0.1", server.listen_port());
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 1; }));
+
+    std::this_thread::sleep_for(500ms);
+    EXPECT_EQ(cli->get_statistics().sync_requests_sent, requests_after_first)
+        << "a reconnect inside the throttle window must not ask for the store again";
+
+    client.stop();
+    server.stop();
+}
+
+// Interop: a peer that predates the digest sends a bare one-byte request. It must
+// still receive the whole snapshot -- the extension lives entirely in bytes the
+// old handler never read, and this is what makes it safe to deploy against peers
+// already in the field.
+TEST_F(StorageReplicationTest, LegacyBareSyncRequestStillGetsTheWholeSnapshot) {
+    constexpr int kEntries = 12;
+
+    Node server(sync_node_config(true));
+    Node client(sync_node_config(false));
+
+    // Throttle off and sync off on the client, so the only request in this test
+    // is the hand-built legacy one below.
+    StorageConfig client_cfg = sync_storage_config(16 * 1024, 0);
+    client_cfg.enable_sync = false;
+
+    auto server_store = std::make_unique<StorageManager>(sync_storage_config(16 * 1024, 0));
+    auto client_store = std::make_unique<StorageManager>(client_cfg);
+    StorageManager* srv = server_store.get();
+    StorageManager* cli = client_store.get();
+
+    server.add_subsystem(std::move(server_store));
+    client.add_subsystem(std::move(client_store));
+
+    ASSERT_TRUE(server.start());
+    for (int i = 0; i < kEntries; i++) {
+        ASSERT_TRUE(srv->put("legacy_" + std::to_string(i), filler(128, i)));
+    }
+
+    ASSERT_TRUE(client.start());
+    client.connect("127.0.0.1", server.listen_port());
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 1 && server.peer_count() == 1; }));
+
+    // enable_sync=false means the client's StorageManager registered no handler,
+    // so receive the response here instead and feed it back in by hand -- the
+    // point under test is what the *server* answers a bare request with.
+    std::atomic<int> entries_seen{0};
+    client.on(MessageType::Storage, [&](const Peer&, ByteView payload) {
+        if (payload.empty() || payload.data()[0] != 3 /* OP_SYNC_RESPONSE */) return;
+        if (payload.size() < 5) return;
+        const uint8_t* p = payload.data();
+        const uint32_t count = (static_cast<uint32_t>(p[1]) << 24) |
+                               (static_cast<uint32_t>(p[2]) << 16) |
+                               (static_cast<uint32_t>(p[3]) << 8) | p[4];
+        entries_seen += static_cast<int>(count);
+    });
+
+    // Exactly what a pre-digest peer puts on the wire: the opcode, nothing else.
+    const std::vector<uint8_t> legacy_request{2 /* OP_SYNC_REQUEST */};
+    ASSERT_TRUE(client.send(server.local_id(), MessageType::Storage, ByteView(legacy_request)));
+
+    EXPECT_TRUE(wait_for([&] { return entries_seen.load() >= kEntries; }, 20s))
+        << "a bare legacy request got " << entries_seen.load() << " of " << kEntries << " entries";
+    EXPECT_EQ(cli->size(), 0u) << "the client's own store should not have been touched";
+
+    client.stop();
+    server.stop();
+}
+
+// An entry too large for any single message must not take the rest of the
+// snapshot down with it. The link refuses such a frame without ever marking
+// itself un-writable -- there is nothing to wait for -- so a pump that stopped
+// on the refusal would wait for a wakeup that never comes, and every entry
+// behind the big one would be stranded for as long as the peer stayed connected.
+// So: skip it, and keep going.
+TEST_F(StorageReplicationTest, OversizedEntryIsSkippedWithoutStrandingTheRest) {
+    constexpr size_t kQueueLimit = 64 * 1024;
+    constexpr int    kSmall      = 5;
+
+    Node server(sync_node_config(true, kQueueLimit));
+    Node client(sync_node_config(false, kQueueLimit));
+
+    auto server_store = std::make_unique<StorageManager>(sync_storage_config());
+    auto client_store = std::make_unique<StorageManager>(sync_storage_config());
+    StorageManager* srv = server_store.get();
+    StorageManager* cli = client_store.get();
+
+    server.add_subsystem(std::move(server_store));
+    client.add_subsystem(std::move(client_store));
+
+    ASSERT_TRUE(server.start());
+    // Well past the whole send queue, so no amount of draining could carry it.
+    ASSERT_TRUE(srv->put("too_big", filler(kQueueLimit * 3, 1)));
+    for (int i = 0; i < kSmall; i++) {
+        ASSERT_TRUE(srv->put("small_" + std::to_string(i), filler(128, i)));
+    }
+
+    ASSERT_TRUE(client.start());
+    client.connect("127.0.0.1", server.listen_port());
+    ASSERT_TRUE(wait_for([&] { return client.peer_count() == 1 && server.peer_count() == 1; }));
+
+    ASSERT_TRUE(wait_for([&] { return cli->size() == static_cast<size_t>(kSmall); }, 20s))
+        << "entries behind the oversized one were stranded: got " << cli->size()
+        << " of " << kSmall;
+
+    for (int i = 0; i < kSmall; i++) {
+        const auto v = cli->get_string("small_" + std::to_string(i));
+        ASSERT_TRUE(v.has_value()) << "missing small_" << i;
+        EXPECT_EQ(*v, filler(128, i));
+    }
+    EXPECT_FALSE(cli->get_string("too_big").has_value())
+        << "an entry that cannot be framed must not appear to have been sent";
+    EXPECT_EQ(client.peer_count(), 1u);
 
     client.stop();
     server.stop();

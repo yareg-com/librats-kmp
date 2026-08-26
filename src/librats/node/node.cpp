@@ -470,6 +470,7 @@ std::optional<Peer> Node::peer(const PeerId& id) {
 // ── Application messaging ────────────────────────────────────────────────────
 
 bool Node::send(const PeerId& to, std::string_view channel, ByteView payload) {
+    if (!fits_send_queue(to, payload.size())) return false;
     // Route and writability in one lookup. The answer is the queue's state as of
     // now rather than after this message lands — the send itself is handed to the
     // owning reactor and completes there — which is all a backpressure hint can
@@ -492,6 +493,7 @@ bool Node::peer_writable(const PeerId& id) const {
 }
 
 bool Node::broadcast(std::string_view channel, ByteView payload) {
+    if (!fits_send_queue(PeerId{}, payload.size())) return false;
     auto data = std::make_shared<const Bytes>(payload.to_bytes());
     FrameHeader header{MessageType::App, 0, MessageRouter::channel_id(channel)};
     reactors_->for_each([&](Reactor& r) { r.broadcast(header, data); });
@@ -501,6 +503,7 @@ bool Node::broadcast(std::string_view channel, ByteView payload) {
 // ── PeerNetwork (subsystems) ─────────────────────────────────────────────────
 
 bool Node::send(const PeerId& to, MessageType type, ByteView payload) {
+    if (!fits_send_queue(to, payload.size())) return false;
     auto dest = peers_.destination(to);
     if (!dest) return false;
     const size_t in_transit =
@@ -510,6 +513,7 @@ bool Node::send(const PeerId& to, MessageType type, ByteView payload) {
 }
 
 bool Node::broadcast(MessageType type, ByteView payload) {
+    if (!fits_send_queue(PeerId{}, payload.size())) return false;
     auto data = std::make_shared<const Bytes>(payload.to_bytes());
     FrameHeader header{type, 0, 0};
     reactors_->for_each([&](Reactor& r) { r.broadcast(header, data); });
@@ -542,10 +546,26 @@ void Node::route_send(PeerRoute route, FrameHeader header, Bytes payload,
     });
 }
 
-size_t Node::send_low_water() const noexcept {
-    const size_t limit = config_.send_queue_limit != 0 ? config_.send_queue_limit
-                                                       : Connection::kDefaultSendHighWater;
-    return limit / 4;
+size_t Node::send_queue_limit() const noexcept {
+    return config_.send_queue_limit != 0 ? config_.send_queue_limit
+                                         : Connection::kDefaultSendHighWater;
+}
+
+size_t Node::send_low_water() const noexcept { return send_queue_limit() / 4; }
+
+size_t Node::max_message_size() const { return Connection::max_payload(send_queue_limit()); }
+
+bool Node::fits_send_queue(const PeerId& to, size_t payload) const {
+    // Answered here, synchronously, rather than left to the connection: this is a
+    // property of the payload and the configured cap alone, and refusing early is
+    // what keeps an unsendable message from being charged against the peer's
+    // in-transit counter — which would make the *next* send to that peer answer
+    // "no room" over bytes that were never going to be queued.
+    if (payload <= max_message_size()) return true;
+    LOG_WARN("node", "Dropping a " << payload << " B message"
+             << (to.is_zero() ? std::string() : " for peer " + to.short_hex())
+             << ": a send queue holds at most " << max_message_size() << " B of payload");
+    return false;
 }
 
 void Node::route_close(PeerRoute route) {
@@ -850,6 +870,10 @@ std::vector<Address> Node::observed_addresses() const {
 // ── Peer handle methods (defined here for the full Node type) ────────────────
 
 void Peer::send(std::string_view channel, ByteView payload) const {
+    // No return value to answer through, so the size check is worth making here
+    // anyway: it names the peer and the limit, where the connection's backstop
+    // only sees a frame that will not fit.
+    if (!node_->fits_send_queue(id_, payload.size())) return;
     node_->route_send(route_, FrameHeader{MessageType::App, 0, MessageRouter::channel_id(channel)},
                       payload.to_bytes());
 }

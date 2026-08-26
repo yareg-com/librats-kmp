@@ -46,10 +46,17 @@ public:
     virtual uint8_t             transports() const { return PeerTransportTcp; }
     virtual const std::string&  protocol() const = 0;        ///< app protocol id (e.g. "librats/1.0"); namespaces discovery
     virtual void                connect(const Address& address) = 0;  ///< dial a discovered peer
+    /// The largest payload send()/broadcast() can ever queue for a peer: beyond
+    /// it a frame does not fit the send queue however empty that queue is, and is
+    /// refused outright. A subsystem with something bulky to move chunks against
+    /// this — see StorageManager's snapshot pump. Default: unbounded, which is
+    /// all a mock that merely moves messages has to claim.
+    virtual size_t              max_message_size() const { return static_cast<size_t>(-1); }
     /// Send to one peer. @return whether that peer's send queue still has room;
     /// false means "stop and wait for on_peer_writable" — the message is queued
-    /// either way, but continuing past this is what gets a peer dropped as a slow
-    /// consumer. Also false if the peer is not connected.
+    /// either way, but a caller that keeps offering past it starts losing frames
+    /// once the queue reaches its hard cap. Also false, with nothing queued, if
+    /// the peer is not connected or the payload exceeds max_message_size().
     virtual bool                send(const PeerId& to, MessageType type, ByteView payload) = 0;
     /// Send to every connected peer. @return whether *every* one of them still
     /// has room, so a subsystem that fans out can pause on the slowest.

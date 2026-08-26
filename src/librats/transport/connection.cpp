@@ -51,6 +51,47 @@ uint8_t Connection::reactor_index() const noexcept { return reactor_.index(); }
 bool Connection::send(FrameHeader header, ByteView payload) {
     if (state_ != ConnState::Established) return false;  // frames only flow post-handshake
 
+    // The high-water mark bounds the memory this connection may hold. Enforcing
+    // it by *dropping the peer* punished the peer for what the caller did, and
+    // reported itself through the same `false` that means "ease off" — leaving a
+    // caller unable to tell a pause from a death. Refusing the frame keeps the
+    // bound exactly as tight and leaves the link intact.
+    //
+    // Both checks happen BEFORE encrypting: encrypt() advances the session's
+    // nonce, so a frame encrypted and then dropped leaves our cipher a step
+    // ahead of the peer's and every later frame fails to decrypt — the refusal
+    // would cost the connection anyway, by a longer road than the close it
+    // replaced. Session::overhead() is what makes the framed size known this early.
+    const size_t block_size =
+        framer::kLengthPrefixSize + framer::kHeaderSize + payload.size() + session_->overhead();
+
+    // Bigger than the queue may ever hold: draining cannot help, so this is a
+    // caller's error rather than congestion. Node refuses such a payload up front
+    // (Node::max_message_size) and this is the backstop for the paths that do not
+    // pass through it. Deliberately does NOT flag the connection un-writable —
+    // promising a wakeup would only invite the same impossible frame again.
+    if (block_size > send_high_water_) {
+        LOG_WARN("connection", "Peer " << remote_id_.short_hex() << " dropping a "
+                 << block_size << " B frame: it exceeds the send high-water mark ("
+                 << send_high_water_ << " B) and can never be queued");
+        return false;
+    }
+
+    // Would fit an empty queue, but not this one. Only a caller that kept going
+    // after send() already answered false reaches this, and dropping its frame is
+    // what bounds the queue. Mark the connection un-writable if it is not already,
+    // so on_writable_changed still wakes the caller once the queue drains.
+    if (backlog() + block_size > send_high_water_) {
+        LOG_DEBUG("connection", "Peer " << remote_id_.short_hex() << " dropping a "
+                  << block_size << " B frame: " << backlog() << " B already queued of "
+                  << send_high_water_ << " B");
+        if (!over_low_water_) {
+            over_low_water_ = true;
+            delegate_.on_writable_changed(*this, false);
+        }
+        return false;
+    }
+
     Bytes inner;
     framer::encode_message(inner, header, payload);
 
@@ -64,21 +105,12 @@ bool Connection::send(FrameHeader header, ByteView payload) {
     queue_block(std::move(cipher));
 
     const size_t backlog_now = backlog();
-    if (backlog_now > send_high_water_) {
-        LOG_WARN("connection", "Peer " << remote_id_.short_hex() << " over send high-water ("
-                 << backlog_now << " B); closing as slow consumer");
-        close_reason_ = CloseReason::SlowConsumer;
-        state_ = ConnState::Closing;
-        reactor_.close(id_, CloseReason::SlowConsumer);
-        return false;
-    }
 
     // The queue has grown past what a caller should keep adding to. Everything
     // still goes out — nothing is dropped here — but the answer to "may I send
     // more?" becomes no, and stays no until the queue drains back under the mark
-    // and on_writable says so. Without this an application has no way at all to
-    // tell that it is outrunning the link, and the only thing that eventually
-    // tells it is the disconnection above.
+    // and on_writable says so. This is where a well-behaved caller stops; the
+    // hard cap checked above is the backstop for one that does not.
     if (!over_low_water_ && backlog_now > send_low_water_) {
         over_low_water_ = true;
         delegate_.on_writable_changed(*this, false);
